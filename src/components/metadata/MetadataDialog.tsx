@@ -462,7 +462,11 @@ export function MetadataDialog({ open, onOpenChange, initialImage }: MetadataDia
                                                         <div className="font-medium text-muted-foreground mb-1">
                                                             Pos: {cap.centers.map(c => `(${c.x.toFixed(2)}, ${c.y.toFixed(2)})`).join(', ')}
                                                         </div>
-                                                        <div className="line-clamp-2">{cap.char_caption}</div>
+                                                        <Textarea
+                                                            value={cap.char_caption}
+                                                            readOnly
+                                                            className="text-xs resize-none h-20 bg-transparent border-0 p-0 focus-visible:ring-0 cursor-text select-text"
+                                                        />
                                                     </div>
                                                 ))}
                                             </div>

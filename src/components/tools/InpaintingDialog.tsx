@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Label } from "@/components/ui/label"
 import { useGenerationStore } from '@/stores/generation-store'
+import { useToolsStore } from '@/stores/tools-store'
 import { useTranslation } from 'react-i18next'
 import { Paintbrush, Eraser, Undo, Trash2, Save } from 'lucide-react'
 
@@ -23,7 +24,14 @@ export function InpaintingDialog({ open, onOpenChange, sourceImage: propSourceIm
         mask: existingMask
     } = useGenerationStore()
 
-    const [brushSize, setBrushSize] = useState([50])
+    const {
+        inpaintingBrushSize,
+        setInpaintingBrushSize
+    } = useToolsStore()
+
+    // Derived state for slider (it expects array)
+    const brushSize = [inpaintingBrushSize]
+    const setBrushSize = (val: number[]) => setInpaintingBrushSize(val[0])
     const [isErasing, setIsErasing] = useState(false)
 
     // Canvas & State

@@ -422,6 +422,8 @@ function convertNAIFormat(data: Record<string, unknown>): NAIMetadata {
     // Basic prompts
     if (data.prompt) metadata.prompt = String(data.prompt)
     if (data.uc) metadata.negativePrompt = String(data.uc)
+    if (!metadata.negativePrompt && data.negative_prompt) metadata.negativePrompt = String(data.negative_prompt)
+    if (!metadata.negativePrompt && data.undesired_content) metadata.negativePrompt = String(data.undesired_content)
 
     // Generation params
     if (data.steps) metadata.steps = Number(data.steps)

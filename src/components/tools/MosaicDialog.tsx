@@ -8,6 +8,7 @@ import { Download, Grid3X3, Minus, Plus } from "lucide-react"
 import { save } from "@tauri-apps/plugin-dialog"
 import { writeFile } from "@tauri-apps/plugin-fs"
 import { toast } from "@/components/ui/use-toast"
+import { useToolsStore } from '@/stores/tools-store'
 
 interface MosaicDialogProps {
     sourceImage: string | null
@@ -24,8 +25,15 @@ export function MosaicDialog({
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const [isDrawing, setIsDrawing] = useState(false)
-    const [pixelSize, setPixelSize] = useState(10)
-    const [brushSize, setBrushSize] = useState(50)
+
+
+    // Persisted state
+    const {
+        mosaicPixelSize: pixelSize,
+        setMosaicPixelSize: setPixelSize,
+        mosaicBrushSize: brushSize,
+        setMosaicBrushSize: setBrushSize
+    } = useToolsStore()
 
     // Track which grid cells have been mosaicked to prevent stacking
     const mosaickedCellsRef = useRef<Set<string>>(new Set())

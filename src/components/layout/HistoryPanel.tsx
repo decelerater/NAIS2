@@ -210,7 +210,7 @@ const HistoryImageItem = memo(function HistoryImageItem({
 
 export function HistoryPanel() {
     const { t } = useTranslation()
-    const { setPreviewImage, isGenerating, setIsGenerating } = useGenerationStore()
+    const { setPreviewImage, isGenerating, setIsGenerating, setSeed } = useGenerationStore()
     const { savePath, useAbsolutePath } = useSettingsStore()
     const [savedImages, setSavedImages] = useState<SavedImage[]>([])
     const [imageThumbnails, setImageThumbnails] = useState<Record<string, string>>({})
@@ -479,22 +479,35 @@ export function HistoryPanel() {
 
 
     const handleImageClick = async (image: SavedImage) => {
-        if (imageThumbnails[image.path]) {
-            setPreviewImage(imageThumbnails[image.path])
-            navigate('/') // Navigate to main mode to show the image
-            return
+        let finalDataUrl = imageThumbnails[image.path]
+
+        // Load if missing
+        if (!finalDataUrl) {
+            try {
+                const data = await readFile(image.path)
+                const base64 = arrayBufferToBase64(data)
+                finalDataUrl = `data:image/png;base64,${base64}`
+                setImageThumbnails(prev => ({ ...prev, [image.path]: finalDataUrl }))
+            } catch (e) {
+                console.error('Failed to load image:', e)
+                return
+            }
         }
 
+        // Set preview
+        setPreviewImage(finalDataUrl)
+
+        // Sync Seed
         try {
-            const data = await readFile(image.path)
-            const base64 = arrayBufferToBase64(data)
-            const dataUrl = `data:image/png;base64,${base64}`
-            setPreviewImage(dataUrl)
-            setImageThumbnails(prev => ({ ...prev, [image.path]: dataUrl }))
-            navigate('/') // Navigate to main mode to show the image
-        } catch (e) {
-            console.error('Failed to load image:', e)
+            const metadata = await parseMetadataFromBase64(finalDataUrl)
+            if (metadata && metadata.seed) {
+                setSeed(metadata.seed)
+            }
+        } catch (error) {
+            console.warn('Failed to parse metadata for seed sync:', error)
         }
+
+        navigate('/') // Navigate to main mode to show the image
     }
 
     const handleDeleteImage = async (image: SavedImage, e?: React.MouseEvent) => {
