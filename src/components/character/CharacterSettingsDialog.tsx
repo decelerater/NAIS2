@@ -206,11 +206,12 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
                         </Button>
                     </div>
                     <div className="flex-1 space-y-3 min-w-0">
-                        {/* Style Aware - Slider */}
+                        {/* Style Aware - Toggle (0 or 1 only, like official NAI checkbox) */}
                         <SafeSlider
                             label={t('characterDialog.styleAware', '스타일 인지 (Style Aware)')}
                             value={[img.informationExtracted]}
                             onValueCommit={([v]) => onUpdate(img.id, { informationExtracted: v })}
+                            step={1}
                         />
                         {/* Fidelity - Slider */}
                         <SafeSlider

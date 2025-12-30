@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2, Pencil, Check, X, FolderOpen } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X, FolderOpen, GripVertical } from 'lucide-react'
 import {
     Dialog,
     DialogContent,
@@ -13,10 +13,168 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { usePresetStore } from '@/stores/preset-store'
 import { cn } from '@/lib/utils'
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+} from '@dnd-kit/core'
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers'
 
 interface PresetDialogContentProps {
     open?: boolean
     onOpenChange?: (open: boolean) => void
+}
+
+interface SortablePresetItemProps {
+    preset: {
+        id: string
+        name: string
+        isDefault?: boolean
+    }
+    isActive: boolean
+    isEditing: boolean
+    editName: string
+    onSelect: () => void
+    onStartEdit: (e: React.MouseEvent) => void
+    onDelete: (e: React.MouseEvent) => void
+    onRename: () => void
+    onCancelEdit: () => void
+    onEditNameChange: (name: string) => void
+    t: (key: string, fallback?: string) => string
+}
+
+function SortablePresetItem({
+    preset,
+    isActive,
+    isEditing,
+    editName,
+    onSelect,
+    onStartEdit,
+    onDelete,
+    onRename,
+    onCancelEdit,
+    onEditNameChange,
+    t
+}: SortablePresetItemProps) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({
+        id: preset.id,
+        disabled: preset.isDefault, // Default preset cannot be dragged
+    })
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 1000 : undefined,
+    }
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={cn(
+                "flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors",
+                isActive
+                    ? "bg-primary/10 border border-primary/30"
+                    : "bg-muted/30 hover:bg-muted/50 border border-transparent",
+                isDragging && "shadow-lg"
+            )}
+            onClick={onSelect}
+        >
+            {/* Drag handle - only for non-default presets */}
+            {!preset.isDefault && (
+                <div
+                    {...attributes}
+                    {...listeners}
+                    className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <GripVertical className="h-4 w-4" />
+                </div>
+            )}
+
+            {isEditing ? (
+                <div className="flex items-center gap-1 flex-1" onClick={e => e.stopPropagation()}>
+                    <Input
+                        value={editName}
+                        onChange={(e) => onEditNameChange(e.target.value)}
+                        className="h-7 text-sm"
+                        autoFocus
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') onRename()
+                            if (e.key === 'Escape') onCancelEdit()
+                        }}
+                    />
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 shrink-0"
+                        onClick={onRename}
+                    >
+                        <Check className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 shrink-0"
+                        onClick={onCancelEdit}
+                    >
+                        <X className="h-3.5 w-3.5" />
+                    </Button>
+                </div>
+            ) : (
+                <>
+                    <span className="flex-1 text-sm font-medium truncate">
+                        {preset.isDefault ? t('preset.default', '기본') : preset.name}
+                    </span>
+                    {isActive && (
+                        <span className="text-[10px] text-primary font-medium px-1.5 py-0.5 bg-primary/10 rounded">
+                            {t('preset.active', '활성')}
+                        </span>
+                    )}
+                    {!preset.isDefault && (
+                        <div className="flex items-center gap-0.5">
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={onStartEdit}
+                            >
+                                <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 text-destructive hover:text-destructive"
+                                onClick={onDelete}
+                            >
+                                <Trash2 className="h-3 w-3" />
+                            </Button>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    )
 }
 
 function PresetDialogContent({ open: externalOpen, onOpenChange: externalOnOpenChange }: PresetDialogContentProps) {
@@ -28,10 +186,11 @@ function PresetDialogContent({ open: externalOpen, onOpenChange: externalOnOpenC
         deletePreset,
         loadPreset,
         renamePreset,
+        reorderPresets,
     } = usePresetStore()
 
     const [internalOpen, setInternalOpen] = useState(false)
-    
+
     // Use external state if provided, otherwise internal
     const open = externalOpen !== undefined ? externalOpen : internalOpen
     const setOpen = externalOnOpenChange || setInternalOpen
@@ -40,6 +199,17 @@ function PresetDialogContent({ open: externalOpen, onOpenChange: externalOnOpenC
     const [newName, setNewName] = useState('')
     const [editingId, setEditingId] = useState<string | null>(null)
     const [editName, setEditName] = useState('')
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    )
 
     // Reset state when dialog closes
     useEffect(() => {
@@ -78,6 +248,16 @@ function PresetDialogContent({ open: externalOpen, onOpenChange: externalOnOpenC
         setEditName(currentName)
     }
 
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event
+
+        if (over && active.id !== over.id) {
+            const oldIndex = presets.findIndex(p => p.id === active.id)
+            const newIndex = presets.findIndex(p => p.id === over.id)
+            reorderPresets(oldIndex, newIndex)
+        }
+    }
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -93,85 +273,39 @@ function PresetDialogContent({ open: externalOpen, onOpenChange: externalOnOpenC
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                    {presets.map(preset => (
-                        <div
-                            key={preset.id}
-                            className={cn(
-                                "flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors",
-                                activePresetId === preset.id
-                                    ? "bg-primary/10 border border-primary/30"
-                                    : "bg-muted/30 hover:bg-muted/50 border border-transparent"
-                            )}
-                            onClick={() => handleSelect(preset.id)}
-                        >
-                            {editingId === preset.id ? (
-                                <div className="flex items-center gap-1 flex-1" onClick={e => e.stopPropagation()}>
-                                    <Input
-                                        value={editName}
-                                        onChange={(e) => setEditName(e.target.value)}
-                                        className="h-7 text-sm"
-                                        autoFocus
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') handleRename(preset.id)
-                                            if (e.key === 'Escape') setEditingId(null)
-                                        }}
-                                    />
-                                    <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-6 w-6 shrink-0"
-                                        onClick={() => handleRename(preset.id)}
-                                    >
-                                        <Check className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-6 w-6 shrink-0"
-                                        onClick={() => setEditingId(null)}
-                                    >
-                                        <X className="h-3.5 w-3.5" />
-                                    </Button>
-                                </div>
-                            ) : (
-                                <>
-                                    <span className="flex-1 text-sm font-medium truncate">
-                                        {preset.isDefault ? t('preset.default', '기본') : preset.name}
-                                    </span>
-                                    {activePresetId === preset.id && (
-                                        <span className="text-[10px] text-primary font-medium px-1.5 py-0.5 bg-primary/10 rounded">
-                                            {t('preset.active', '활성')}
-                                        </span>
-                                    )}
-                                    {!preset.isDefault && (
-                                        <div className="flex items-center gap-0.5">
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                className="h-6 w-6"
-                                                onClick={(e) => startEdit(preset.id, preset.name, e)}
-                                            >
-                                                <Pencil className="h-3 w-3" />
-                                            </Button>
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                className="h-6 w-6 text-destructive hover:text-destructive"
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    deletePreset(preset.id)
-                                                }}
-                                            >
-                                                <Trash2 className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    )}
-                                </>
-                            )}
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                    modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                >
+                    <SortableContext
+                        items={presets.map(p => p.id)}
+                        strategy={verticalListSortingStrategy}
+                    >
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                            {presets.map(preset => (
+                                <SortablePresetItem
+                                    key={preset.id}
+                                    preset={preset}
+                                    isActive={activePresetId === preset.id}
+                                    isEditing={editingId === preset.id}
+                                    editName={editName}
+                                    onSelect={() => handleSelect(preset.id)}
+                                    onStartEdit={(e) => startEdit(preset.id, preset.name, e)}
+                                    onDelete={(e) => {
+                                        e.stopPropagation()
+                                        deletePreset(preset.id)
+                                    }}
+                                    onRename={() => handleRename(preset.id)}
+                                    onCancelEdit={() => setEditingId(null)}
+                                    onEditNameChange={setEditName}
+                                    t={t}
+                                />
+                            ))}
                         </div>
-                    ))}
-                </div>
+                    </SortableContext>
+                </DndContext>
 
                 {/* Add new preset */}
                 <div className="pt-2 border-t">

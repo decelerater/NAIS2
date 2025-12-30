@@ -61,6 +61,7 @@ interface CharacterPromptState {
     toggleEnabled: (id: string) => void
     clearAll: () => void
     setPositionEnabled: (enabled: boolean) => void
+    reorderCharacters: (oldIndex: number, newIndex: number) => void
 
     // Presets (Library)
     addPreset: (data: Partial<CharacterPreset> & Omit<CharacterPreset, 'id'>) => void
@@ -129,6 +130,15 @@ export const useCharacterPromptStore = create<CharacterPromptState>()(
             clearAll: () => set({ characters: [] }),
 
             setPositionEnabled: (enabled) => set({ positionEnabled: enabled }),
+
+            reorderCharacters: (oldIndex, newIndex) => {
+                set(state => {
+                    const newCharacters = [...state.characters]
+                    const [removed] = newCharacters.splice(oldIndex, 1)
+                    newCharacters.splice(newIndex, 0, removed)
+                    return { characters: newCharacters }
+                })
+            },
 
             // Preset Actions
             addPreset: (data) => {

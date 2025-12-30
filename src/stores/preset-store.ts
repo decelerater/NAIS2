@@ -64,6 +64,7 @@ interface PresetState {
     syncFromGenerationStore: () => void
     loadPreset: (id: string) => void
     renamePreset: (id: string, name: string) => void
+    reorderPresets: (oldIndex: number, newIndex: number) => void
     getActivePreset: () => Preset | undefined
 }
 
@@ -207,6 +208,18 @@ export const usePresetStore = create<PresetState>()(
                         p.id === id ? { ...p, name } : p
                     )
                 }))
+            },
+
+            reorderPresets: (oldIndex, newIndex) => {
+                // Don't allow reordering if involving the default preset at index 0
+                if (oldIndex === 0 || newIndex === 0) return
+
+                set(state => {
+                    const newPresets = [...state.presets]
+                    const [removed] = newPresets.splice(oldIndex, 1)
+                    newPresets.splice(newIndex, 0, removed)
+                    return { presets: newPresets }
+                })
             },
 
             getActivePreset: () => {

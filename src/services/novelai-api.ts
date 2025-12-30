@@ -278,6 +278,8 @@ async function encodeVibeImage(token: string, imageBase64: string, info: number 
 
 /**
  * Resize and pad image for Character Reference (Director Tools)
+ * Adheres to NovelAI Official Specs: 1472x1472, 1536x1024, or 1024x1536
+ * Arbitrary sizes cause 400 Bad Request errors.
  */
 function processCharacterImage(imageBase64: string): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -299,7 +301,7 @@ function processCharacterImage(imageBase64: string): Promise<string> {
                 return
             }
 
-            // Fill black
+            // Fill black (Official Spec: Letterboxing)
             ctx.fillStyle = '#000000'
             ctx.fillRect(0, 0, targetW, targetH)
 
@@ -312,6 +314,8 @@ function processCharacterImage(imageBase64: string): Promise<string> {
 
             // Draw
             ctx.drawImage(img, x, y, w, h)
+
+            console.log(`[CharRef] Resized to official spec: ${width}x${height} -> ${targetW}x${targetH}`)
 
             // Export as JPEG quality 0.95
             const dataUrl = canvas.toDataURL('image/jpeg', 0.95)
@@ -417,10 +421,23 @@ export async function generateImage(
             reference_strength_multiple: params.vibeStrength || [],
 
             // Character Reference (Director tools)
+            // Based on official NovelAI API analysis:
+            // - information_extracted and strength_values are always 1.0
+            // - secondary_strength_values = 1 - Fidelity (INVERTED!)
+            // - Style Aware controls base_caption: "character&style" (ON) vs "character" (OFF)
             director_reference_images: processedCharImages,
-            director_reference_information_extracted: params.charInfo || [],
-            director_reference_strength_values: params.charStrength || [],
-            director_reference_secondary_strength_values: (params.charStrength || []).map(() => 0), // Default to 0
+            director_reference_information_extracted: (params.charInfo || []).map(() => 1.0),
+            director_reference_strength_values: (params.charInfo || []).map(() => 1.0),
+            // Fidelity is INVERTED: UI 0 = API 1, UI 1 = API 0
+            director_reference_secondary_strength_values: (params.charStrength || []).map(s => 1.0 - s),
+            // Style Aware: charInfo >= 0.5 = ON ("character&style"), < 0.5 = OFF ("character")
+            director_reference_descriptions: (params.charInfo || []).map(info => ({
+                caption: {
+                    base_caption: info >= 0.5 ? "character&style" : "character",
+                    char_captions: []
+                },
+                legacy_uc: false
+            })),
 
             // V4 prompt format
             v4_prompt: {
@@ -780,10 +797,23 @@ export async function generateImageStream(
             reference_strength_multiple: params.vibeStrength || [],
 
             // Character Reference (Director tools)
+            // Based on official NovelAI API analysis:
+            // - information_extracted and strength_values are always 1.0
+            // - secondary_strength_values = 1 - Fidelity (INVERTED!)
+            // - Style Aware controls base_caption: "character&style" (ON) vs "character" (OFF)
             director_reference_images: processedCharImages,
-            director_reference_information_extracted: (params.charInfo || []).map(() => 1.0), // Force 1.0 as per legacy
-            director_reference_strength_values: params.charStrength || [],
-            director_reference_secondary_strength_values: (params.charStrength || []).map(() => 0), // Default to 0
+            director_reference_information_extracted: (params.charInfo || []).map(() => 1.0),
+            director_reference_strength_values: (params.charInfo || []).map(() => 1.0),
+            // Fidelity is INVERTED: UI 0 = API 1, UI 1 = API 0
+            director_reference_secondary_strength_values: (params.charStrength || []).map(s => 1.0 - s),
+            // Style Aware: charInfo >= 0.5 = ON ("character&style"), < 0.5 = OFF ("character")
+            director_reference_descriptions: (params.charInfo || []).map(info => ({
+                caption: {
+                    base_caption: info >= 0.5 ? "character&style" : "character",
+                    char_captions: []
+                },
+                legacy_uc: false
+            })),
 
             // V4 prompt format initialization
             v4_prompt: {
