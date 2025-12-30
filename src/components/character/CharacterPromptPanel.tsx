@@ -38,7 +38,6 @@ import { cn } from '@/lib/utils'
 import {
     DndContext,
     closestCenter,
-    KeyboardSensor,
     PointerSensor,
     useSensor,
     useSensors,
@@ -46,7 +45,6 @@ import {
 } from '@dnd-kit/core'
 import {
     SortableContext,
-    sortableKeyboardCoordinates,
     useSortable,
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
@@ -77,16 +75,19 @@ export function CharacterPromptPanel({ open, onOpenChange }: CharacterPromptPane
     const [searchQuery, setSearchQuery] = useState('')
 
     // DnD sensors
+    // 키보드 센서 제거 (입력창 스페이스바/엔터 충돌 방지)
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
                 distance: 8,
             },
-        }),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
         })
     )
+
+    const handleDragStart = () => {
+        // 드래그 시작 시 펼쳐진 카드 닫기
+        setExpandedId(null)
+    }
 
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event
@@ -231,6 +232,7 @@ export function CharacterPromptPanel({ open, onOpenChange }: CharacterPromptPane
                     <DndContext
                         sensors={sensors}
                         collisionDetection={closestCenter}
+                        onDragStart={handleDragStart}
                         onDragEnd={handleDragEnd}
                         modifiers={[restrictToVerticalAxis, restrictToParentElement]}
                     >
