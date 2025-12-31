@@ -483,27 +483,10 @@ async fn zoom_embedded_browser(app: AppHandle, zoom_level: f64) -> Result<(), St
 
 #[tauri::command]
 async fn check_tagger_binary() -> bool {
-    // Check if tagger-server executable exists in the current working directory or adjacent to the executable
-    let mut path = std::env::current_exe().unwrap_or_default();
-    path.pop(); // Get directory
-
-    #[cfg(target_os = "windows")]
-    path.push("tagger-server.exe");
-    #[cfg(not(target_os = "windows"))]
-    path.push("tagger-server");
-
-    if path.exists() {
-        return true;
-    }
-
-    // Also check current working directory as fallback
-    let mut cwd_path = std::env::current_dir().unwrap_or_default();
-    #[cfg(target_os = "windows")]
-    cwd_path.push("tagger-server.exe");
-    #[cfg(not(target_os = "windows"))]
-    cwd_path.push("tagger-server");
-
-    cwd_path.exists()
+    // With sidecar (externalBin), the binary is bundled and managed by Tauri.
+    // We assume it's present if the build succeeded.
+    // Runtime errors during spawn will be handled by start_tagger.
+    true
 }
 
 fn spawn_tagger_sc(app: &AppHandle) -> Result<(), String> {
@@ -514,64 +497,17 @@ fn spawn_tagger_sc(app: &AppHandle) -> Result<(), String> {
         return Ok(()); // Already running
     }
 
-    // Resolve path to tagger-server
-    // Prioritize adjacent to executable
-    let mut path = std::env::current_exe().map_err(|e| e.to_string())?;
-    path.pop();
-    #[cfg(target_os = "windows")]
-    path.push("tagger-server.exe");
-    #[cfg(not(target_os = "windows"))]
-    path.push("tagger-server");
+    // Use Tauri's sidecar API
+    let command = app
+        .shell()
+        .sidecar("tagger-server")
+        .map_err(|e| format!("Sidecar config error: {}", e))?;
 
-    if !path.exists() {
-        // Fallback to CWD
-        let mut cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-        #[cfg(target_os = "windows")]
-        cwd.push("tagger-server.exe");
-        #[cfg(not(target_os = "windows"))]
-        cwd.push("tagger-server");
-        if cwd.exists() {
-            path = cwd;
-        } else {
-            return Err("tagger-server not found".to_string());
-        }
-    }
-
-    // We use standard Command here because we are running a loose binary
-    // BUT tauri_plugin_shell restricts this.
-    // If we use shell scope, we can use Command::new("absolute_path") if allowed?
-    // Or just Command::new("tagger-server") if it's in path?
-    // Because we're not using sidecar(), we lose the automatic architecture resolution (which we don't want anyway)
-
-    // Actually, to use tauri's shell plugin for an arbitrary path, we need to be careful.
-    // However, since we are in the backend (Rust), we can use std::process::Command directly!
-    // We don't *have* to use the plugin's Command if we don't want to enforce the scope strictly
-    // OR if we want to bypass it.
-    // BUT the original code used `CommandChild` from the plugin which wraps shared child.
-    // `state.0` is `Option<CommandChild>`. `CommandChild` is from `tauri_plugin_shell::process`.
-
-    // If we use std::process::Command, we can't store it in `CommandChild` easily unless we map it.
-    // `CommandChild` allows reading output asynchronously via events if using the JS API,
-    // but here we are in Rust.
-
-    // Wait, `CommandChild` is a wrapper around `SharedChild`.
-    // Let's stick to `tauri_plugin_shell::ShellExt` IF it supports absolute paths.
-    // `app.shell().command("path")`
-
-    let path_str = path.to_string_lossy().to_string();
-
-    // Note: for this to work with tauri permissions, the executable path must be allowed.
-    // If we use std::process, we bypass Tauri's capability check (which is fine for backend logic,
-    // but we lose the easy integration with `CommandChild` struct if it's specific).
-
-    // Let's look at `TaggerState` definition: `pub struct TaggerState(pub Arc<Mutex<Option<CommandChild>>>);`
-    // If we want to keep using TaggerState, we should try to use the shell plugin.
-
-    let command = app.shell().command(&path_str).args(["--port", "8002"]);
+    let command = command.args(["--port", "8002"]);
 
     let (_, child) = command
         .spawn()
-        .map_err(|e| format!("Failed to spawn sidecar at {}: {}", path_str, e))?;
+        .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
 
     *child_guard = Some(child);
     Ok(())

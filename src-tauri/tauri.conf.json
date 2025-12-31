@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "NAIS2",
-  "version": "2.0.18",
+  "version": "2.0.19",
   "identifier": "com.sunakgo.nais2",
   "build": {
     "frontendDist": "../dist",
@@ -39,7 +39,13 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "nsis",
+      "msi"
+    ],
+    "externalBin": [
+      "tagger-server"
+    ],
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
