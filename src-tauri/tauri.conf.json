@@ -41,7 +41,9 @@
     "active": true,
     "targets": [
       "nsis",
-      "msi"
+      "msi",
+      "dmg",
+      "app"
     ],
     "externalBin": [
       "binaries/tagger-server"
