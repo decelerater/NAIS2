@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useEffect, useState, useRef, useCallback, memo } from 'react'
-import { Clock, Trash2, FolderOpen, RefreshCw, FileSearch, Copy, RotateCcw, Save, Users, Image as ImageIcon, Paintbrush, Maximize2, Film } from 'lucide-react'
+import { Clock, Trash2, FolderOpen, RefreshCw, FileSearch, Copy, RotateCcw, Save, Users, Image as ImageIcon, Paintbrush, Maximize2, Film, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useGenerationStore } from '@/stores/generation-store'
 import { useAuthStore } from '@/stores/auth-store'
@@ -41,6 +41,7 @@ interface SavedImage {
     path: string
     timestamp: number
     type: 'main' | 'i2i' | 'inpaint' | 'upscale' | 'scene'
+    isTemporary?: boolean
 }
 
 // Memoized HistoryImageItem - 불필요한 리렌더링 방지
@@ -77,6 +78,7 @@ const HistoryImageItem = memo(function HistoryImageItem({
     }, [thumbnail])
 
     useEffect(() => {
+        if (image.isTemporary) return
         if (!localThumbnail) {
             let active = true
             const load = async () => {
@@ -169,8 +171,15 @@ const HistoryImageItem = memo(function HistoryImageItem({
                     >
                         <Trash2 className="h-3 w-3" />
                     </Button>
-                    <div className="absolute bottom-1 left-1 h-5 w-5 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center">
-                        {getTypeIcon(image.type)}
+                    <div className="absolute bottom-1 left-1 flex gap-1">
+                        <div className="h-5 w-5 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center">
+                            {getTypeIcon(image.type)}
+                        </div>
+                        {image.isTemporary && (
+                            <div className="h-5 w-5 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center">
+                                <Zap className="h-3 w-3 text-yellow-400" />
+                            </div>
+                        )}
                     </div>
                 </div>
             </ContextMenuTrigger>
@@ -183,7 +192,7 @@ const HistoryImageItem = memo(function HistoryImageItem({
                     <Copy className="h-4 w-4 mr-2" />
                     {t('actions.copy', '복사')}
                 </ContextMenuItem>
-                <ContextMenuItem onClick={() => onRegenerate(image)} disabled={isGenerating}>
+                <ContextMenuItem onClick={() => onRegenerate(image)}>
                     <RotateCcw className="h-4 w-4 mr-2" />
                     {t('actions.regenerate', '재생성')}
                 </ContextMenuItem>
@@ -195,7 +204,7 @@ const HistoryImageItem = memo(function HistoryImageItem({
                     <Users className="h-4 w-4 mr-2" />
                     {t('actions.addAsRef', '이미지 참조')}
                 </ContextMenuItem>
-                <ContextMenuItem onClick={() => onOpenFolder(image)}>
+                <ContextMenuItem onClick={() => onOpenFolder(image)} disabled={image.isTemporary}>
                     <FolderOpen className="h-4 w-4 mr-2" />
                     {t('actions.openFolder', '폴더 열기')}
                 </ContextMenuItem>
@@ -235,6 +244,7 @@ export function HistoryPanel() {
     // Add new image instantly to history (no compression - use original directly)
     const addNewImage = useCallback((imagePath: string, imageData: string) => {
         const timestamp = Date.now()
+        const isTemporary = imagePath.startsWith('memory://')
         const name = imagePath.split(/[/\\]/).pop() || `NAIS_${timestamp}.png`
 
         const newImage: SavedImage = {
@@ -244,11 +254,26 @@ export function HistoryPanel() {
             type: imagePath.includes('NAIS_Scene') ? 'scene' :
                 name.includes('INPAINT_') ? 'inpaint' :
                     name.includes('I2I_') ? 'i2i' :
-                        name.includes('UPSCALE_') ? 'upscale' : 'main'
+                        name.includes('UPSCALE_') ? 'upscale' : 'main',
+            isTemporary
         }
 
         // Instantly add to list with original data
-        setSavedImages(prev => [newImage, ...prev].slice(0, 20))
+        setSavedImages(prev => {
+            let next = [newImage, ...prev]
+
+            // Limit temporary images to 10
+            if (isTemporary) {
+                const tempImages = next.filter(img => img.isTemporary)
+                if (tempImages.length > 10) {
+                    // Sort temp images by timestamp (oldest first) to find the one to remove
+                    const sortedTemp = [...tempImages].sort((a, b) => a.timestamp - b.timestamp)
+                    const oldest = sortedTemp[0]
+                    next = next.filter(img => img !== oldest)
+                }
+            }
+            return next.slice(0, 50)
+        })
         setImageThumbnails(prev => ({ ...prev, [imagePath]: imageData }))
     }, [])
 
@@ -430,7 +455,16 @@ export function HistoryPanel() {
             }
 
             images.sort((a, b) => b.timestamp - a.timestamp)
-            setSavedImages(images)
+
+            // Merge with existing temporary images
+            setSavedImages(prev => {
+                const tempImages = prev.filter(img => img.isTemporary)
+                // Enforce limit on merge just in case
+                const sortedTemp = tempImages.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10)
+
+                const combined = [...images, ...sortedTemp]
+                return combined.sort((a, b) => b.timestamp - a.timestamp)
+            })
 
             // NOTE: Removed pre-loading of thumbnails using readFile to prevent UI lag.
             // Using convertFileSrc in the render loop is much more efficient as it uses native asset handling.
@@ -481,8 +515,8 @@ export function HistoryPanel() {
     const handleImageClick = async (image: SavedImage) => {
         let finalDataUrl = imageThumbnails[image.path]
 
-        // Load if missing
-        if (!finalDataUrl) {
+        // Load if missing (unless temporary)
+        if (!finalDataUrl && !image.isTemporary) {
             try {
                 const data = await readFile(image.path)
                 const base64 = arrayBufferToBase64(data)
@@ -521,6 +555,18 @@ export function HistoryPanel() {
 
     const handleDeleteImage = async (image: SavedImage, e?: React.MouseEvent) => {
         e?.stopPropagation()
+
+        // Handle temporary image deletion (just state update)
+        if (image.isTemporary) {
+            setSavedImages(prev => prev.filter(img => img.path !== image.path))
+            setImageThumbnails(prev => {
+                const next = { ...prev }
+                delete next[image.path]
+                return next
+            })
+            return
+        }
+
         try {
             await remove(image.path)
             setSavedImages(prev => prev.filter(img => img.path !== image.path))
@@ -569,8 +615,43 @@ export function HistoryPanel() {
 
     // Regenerate image with its metadata
     const handleRegenerate = async (image: SavedImage) => {
+        if (isGenerating) {
+            toast({ title: t('toast.generating', '생성 중입니다...'), variant: 'default' })
+            return
+        }
+
         const imageData = imageThumbnails[image.path]
-        if (!imageData || isGenerating) return
+        if (!imageData) {
+            // Try to load from file if not temporary and missing from cache
+            if (!image.isTemporary) {
+                try {
+                    const data = await readFile(image.path)
+                    const base64 = arrayBufferToBase64(data)
+                    const loadedData = `data:image/png;base64,${base64}`
+                    // Continue with loadedData... but we need to refactor slightly 
+                    // to avoid complex nesting. Let's just return if truly missing.
+                } catch (e) {
+                    return
+                }
+            } else {
+                return
+            }
+        }
+
+        // Use local variable for data to ensure we have it
+        let finalData = imageThumbnails[image.path]
+        if (!finalData && !image.isTemporary) {
+            try {
+                const data = await readFile(image.path)
+                const base64 = arrayBufferToBase64(data)
+                finalData = `data:image/png;base64,${base64}`
+                setImageThumbnails(prev => ({ ...prev, [image.path]: finalData }))
+            } catch (e) {
+                return
+            }
+        }
+
+        if (!finalData) return
 
         const token = useAuthStore.getState().token
         if (!token) {
@@ -674,6 +755,18 @@ export function HistoryPanel() {
                     } catch (e) {
                         console.warn('Failed to save regenerated image:', e)
                     }
+                } else {
+                    // Auto-save OFF (Regenerate): Dispatch memory-only event
+                    const fileName = `NAIS_${Date.now()}.png`
+                    const memoryPath = `memory://${fileName}`
+
+                    try {
+                        window.dispatchEvent(new CustomEvent('newImageGenerated', {
+                            detail: { path: memoryPath, data: `data:image/png;base64,${result.imageData}` }
+                        }))
+                    } catch (e) {
+                        console.warn('Failed to dispatch newImageGenerated event (Memory):', e)
+                    }
                 }
 
                 toast({ title: t('toast.regenerated', '재생성 완료'), variant: 'success' })
@@ -689,6 +782,7 @@ export function HistoryPanel() {
 
     // Open folder containing saved images
     const handleOpenFolder = async (image: SavedImage) => {
+        if (image.isTemporary) return
         try {
             await Command.create('explorer', ['/select,', image.path]).execute()
         } catch (e) {
@@ -699,11 +793,18 @@ export function HistoryPanel() {
     const handleOpenSmartTools = async (image: SavedImage) => {
         setIsLoading(true)
         try {
-            // Read full image file to pass to tools
-            const data = await readFile(image.path)
-            const base64 = `data:image/png;base64,${arrayBufferToBase64(data)}`
-            setActiveImage(base64)
-            navigate('/tools')
+            let base64 = imageThumbnails[image.path]
+
+            if (!base64 && !image.isTemporary) {
+                // Read full image file to pass to tools
+                const data = await readFile(image.path)
+                base64 = `data:image/png;base64,${arrayBufferToBase64(data)}`
+            }
+
+            if (base64) {
+                setActiveImage(base64)
+                navigate('/tools')
+            }
         } catch (e) {
             toast({ title: t('smartTools.error', '이미지 로드 실패'), variant: 'destructive' })
         } finally {
@@ -713,7 +814,21 @@ export function HistoryPanel() {
 
     const handleSaveAs = async (image: SavedImage) => {
         try {
-            const data = await readFile(image.path)
+            let data: Uint8Array
+
+            if (image.isTemporary) {
+                const base64 = imageThumbnails[image.path]
+                if (!base64) throw new Error("Image data not found")
+                // Convert base64 back to Uint8Array
+                const binaryString = atob(base64.split(',')[1])
+                data = new Uint8Array(binaryString.length)
+                for (let i = 0; i < binaryString.length; i++) {
+                    data[i] = binaryString.charCodeAt(i)
+                }
+            } else {
+                data = await readFile(image.path)
+            }
+
             const filePath = await save({
                 defaultPath: image.name,
                 filters: [{ name: 'PNG Image', extensions: ['png'] }],
@@ -730,7 +845,7 @@ export function HistoryPanel() {
 
     const handleAddAsReference = async (image: SavedImage) => {
         let imageData = imageThumbnails[image.path]
-        if (!imageData) {
+        if (!imageData && !image.isTemporary) {
             try {
                 const data = await readFile(image.path)
                 const base64 = arrayBufferToBase64(data)

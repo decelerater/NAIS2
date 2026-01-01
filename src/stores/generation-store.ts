@@ -464,6 +464,7 @@ export const useGenerationStore = create<GenerationState>()(
                             // Save Image: Try Tauri FS first, fallback to browser
                             const { savePath, autoSave, useAbsolutePath } = useSettingsStore.getState()
 
+
                             if (autoSave) {
                                 try {
                                     const binaryString = atob(result.imageData)
@@ -519,6 +520,26 @@ export const useGenerationStore = create<GenerationState>()(
                                     document.body.appendChild(link)
                                     link.click()
                                     document.body.removeChild(link)
+                                }
+                            } else {
+                                // Auto-save OFF: Dispatch memory-only event
+                                let typePrefix = ''
+                                if (mask) {
+                                    typePrefix = 'INPAINT_'
+                                } else if (sourceImage) {
+                                    typePrefix = 'I2I_'
+                                }
+                                const fileName = `NAIS_${typePrefix}${Date.now()}.png`
+                                const memoryPath = `memory://${fileName}`
+
+                                console.log('[Generate] Auto-save OFF, dispatching memory image:', memoryPath)
+
+                                try {
+                                    window.dispatchEvent(new CustomEvent('newImageGenerated', {
+                                        detail: { path: memoryPath, data: imageUrl }
+                                    }))
+                                } catch (e) {
+                                    console.warn('Failed to dispatch newImageGenerated event (Memory):', e)
                                 }
                             }
 
