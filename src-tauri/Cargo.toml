@@ -1,6 +1,6 @@
 [package]
 name = "nais2"
-version = "2.0.12"
+version = "2.0.24"
 description = "NovelAI Image Studio"
 authors = ["sunakgo"]
 license = "GPL-3.0"
