@@ -93,8 +93,13 @@ interface GenerationState {
     variety: boolean
 
     seed: number
+    previewSeed: number | null
     seedLocked: boolean
     selectedResolution: Resolution
+
+    // Quality settings
+    qualityToggle: boolean
+    ucPreset: number
 
     // Batch generation
     batchCount: number
@@ -142,8 +147,11 @@ interface GenerationState {
     setVariety: (v: boolean) => void
 
     setSeed: (seed: number) => void
+    setPreviewSeed: (seed: number | null) => void
     setSeedLocked: (locked: boolean) => void
     setSelectedResolution: (resolution: Resolution) => void
+    setQualityToggle: (v: boolean) => void
+    setUcPreset: (v: number) => void
 
     setBatchCount: (count: number) => void
 
@@ -188,8 +196,12 @@ export const useGenerationStore = create<GenerationState>()(
             variety: false,
 
             seed: Math.floor(Math.random() * 4294967295),
+            previewSeed: null,
             seedLocked: false,
             selectedResolution: { label: 'Portrait', width: 832, height: 1216 },
+
+            qualityToggle: true,
+            ucPreset: 0,
 
             batchCount: 1,
             currentBatch: 0,
@@ -230,8 +242,11 @@ export const useGenerationStore = create<GenerationState>()(
             setVariety: (variety) => set({ variety }),
 
             setSeed: (seed) => set({ seed }),
+            setPreviewSeed: (previewSeed) => set({ previewSeed }),
             setSeedLocked: (locked) => set({ seedLocked: locked }),
             setSelectedResolution: (resolution) => set({ selectedResolution: resolution }),
+            setQualityToggle: (qualityToggle) => set({ qualityToggle }),
+            setUcPreset: (ucPreset) => set({ ucPreset }),
 
             setBatchCount: (count) => set({ batchCount: count }),
 
