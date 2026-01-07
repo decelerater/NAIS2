@@ -56,6 +56,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "macOS": {
+      "minimumSystemVersion": "10.13",
+      "entitlements": null,
+      "exceptionDomain": null
+    },
     "windows": {
       "nsis": {
         "installMode": "perMachine",

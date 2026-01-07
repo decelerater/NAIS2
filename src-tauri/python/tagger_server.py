@@ -43,8 +43,21 @@ def update_download_status(model_name: str, progress: int = 0, total: int = 0, m
 
 from contextlib import asynccontextmanager
 
+def get_app_data_dir():
+    """Get platform-specific application data directory"""
+    if sys.platform == 'win32':
+        # Windows: %APPDATA%\NAIS\models
+        base = os.getenv('APPDATA', os.path.expanduser('~'))
+        return os.path.join(base, 'NAIS', 'models')
+    elif sys.platform == 'darwin':
+        # macOS: ~/Library/Application Support/NAIS/models
+        return os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'NAIS', 'models')
+    else:
+        # Linux: ~/.local/share/NAIS/models
+        return os.path.join(os.path.expanduser('~'), '.local', 'share', 'NAIS', 'models')
+
 # AppData path for model storage
-APP_DATA_DIR = os.path.join(os.getenv('APPDATA'), 'NAIS', 'models')
+APP_DATA_DIR = get_app_data_dir()
 os.makedirs(APP_DATA_DIR, exist_ok=True)
 
 @asynccontextmanager
