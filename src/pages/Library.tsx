@@ -695,7 +695,7 @@ export default function Library() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute top-4 right-4 text-white hover:bg-white/20 h-10 w-10"
+                        className="absolute top-4 right-4 text-white bg-black/50 hover:bg-black/70 rounded-lg h-10 w-10"
                         onClick={() => setViewerImageSrc(null)}
                     >
                         <X className="h-6 w-6" />

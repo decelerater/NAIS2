@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2, Users, Eye, EyeOff, MapPin, Search, Edit, MoreVertical, Check, X } from 'lucide-react'
+import type { TFunction } from 'i18next'
+import { Plus, Trash2, Users, Eye, EyeOff, MapPin, Search, Edit, MoreVertical, Check, X, Folder, FolderOpen, ChevronRight, ChevronDown, FolderPlus } from 'lucide-react'
 import {
     Dialog,
     DialogContent,
@@ -20,8 +21,12 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubTrigger,
+    DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu'
-import { useCharacterPromptStore, CHARACTER_COLORS, CharacterPrompt, CharacterPreset } from '@/stores/character-prompt-store'
+import { useCharacterPromptStore, CHARACTER_COLORS, CharacterPrompt, CharacterPreset, CharacterGroup } from '@/stores/character-prompt-store'
 import { cn } from '@/lib/utils'
 
 // --- Position Grid Component ---
@@ -220,23 +225,163 @@ function PresetEditor({ open, onOpenChange, initialData, onSave }: PresetEditorP
     )
 }
 
+// --- Preset Card Component ---
+interface PresetCardProps {
+    preset: CharacterPreset
+    characters: CharacterPrompt[]
+    groups: CharacterGroup[]
+    onToggle: (preset: CharacterPreset) => void
+    onEdit: (id: string) => void
+    onDelete: (id: string) => void
+    onMoveToGroup: (presetId: string, groupId: string | undefined) => void
+    getStateColor: (presetId: string) => string | null
+    t: TFunction
+}
+
+function PresetCard({ preset, characters, groups, onToggle, onEdit, onDelete, onMoveToGroup, getStateColor, t }: PresetCardProps) {
+    const isActive = characters.some(c => c.presetId === preset.id)
+    const activeColor = getStateColor(preset.id)
+
+    return (
+        <Card
+            className={cn(
+                "cursor-pointer transition-all hover:shadow-md group relative overflow-hidden",
+                isActive ? "ring-2 ring-primary border-primary bg-primary/5" : "hover:border-primary/50"
+            )}
+            onClick={() => onToggle(preset)}
+        >
+            <CardHeader className="p-3 pb-0 space-y-0">
+                <div className="flex justify-between items-start gap-2">
+                    <div className="font-bold text-sm truncate leading-tight pr-4" title={preset.name}>
+                        {preset.name}
+                    </div>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 -mr-1 -mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={e => e.stopPropagation()}
+                            >
+                                <MoreVertical className="h-3.5 w-3.5" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation()
+                                onEdit(preset.id)
+                            }}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                {t('common.edit', '편집')}
+                            </DropdownMenuItem>
+                            {groups.length > 0 && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuSub>
+                                        <DropdownMenuSubTrigger onClick={(e) => e.stopPropagation()}>
+                                            <Folder className="w-4 h-4 mr-2" />
+                                            {t('characterPromptDialog.moveToFolder', '폴더 이동')}
+                                        </DropdownMenuSubTrigger>
+                                        <DropdownMenuSubContent>
+                                            {preset.groupId && (
+                                                <DropdownMenuItem onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    onMoveToGroup(preset.id, undefined)
+                                                }}>
+                                                    <X className="w-4 h-4 mr-2" />
+                                                    {t('characterPromptDialog.removeFromFolder', '폴더에서 제거')}
+                                                </DropdownMenuItem>
+                                            )}
+                                            {groups.map(group => (
+                                                <DropdownMenuItem
+                                                    key={group.id}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation()
+                                                        onMoveToGroup(preset.id, group.id)
+                                                    }}
+                                                    disabled={preset.groupId === group.id}
+                                                >
+                                                    <Folder className="w-4 h-4 mr-2" />
+                                                    {group.name}
+                                                    {preset.groupId === group.id && (
+                                                        <Check className="w-4 h-4 ml-auto" />
+                                                    )}
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </DropdownMenuSubContent>
+                                    </DropdownMenuSub>
+                                </>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    onDelete(preset.id)
+                                }}
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                {t('common.delete', '삭제')}
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </CardHeader>
+            <CardContent className="p-3">
+                <div className="text-xs text-muted-foreground line-clamp-2 min-h-[2.5em] leading-relaxed">
+                    {preset.prompt || <span className="italic opacity-50">No prompt...</span>}
+                </div>
+            </CardContent>
+
+            {/* Active Indicator Badge */}
+            {isActive && (
+                <div
+                    className="absolute top-0 right-0 w-0 h-0 border-l-[24px] border-l-transparent border-t-[24px]"
+                    style={{ borderTopColor: activeColor || 'currentColor' }}
+                />
+            )}
+            {isActive && (
+                <Check className="absolute top-0.5 right-0.5 w-3 h-3 text-white" />
+            )}
+        </Card>
+    )
+}
+
 // --- Main Component ---
 export function CharacterPromptDialog() {
     const { t } = useTranslation()
     const {
-        characters, presets,
+        characters, presets, groups,
         addPreset, updatePreset, deletePreset, importFromStart,
-        removeCharacter, setPosition, toggleEnabled
+        removeCharacter, setPosition, toggleEnabled,
+        addGroup, updateGroup, deleteGroup, toggleGroupCollapsed
     } = useCharacterPromptStore()
 
     const [search, setSearch] = useState('')
     const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
     const [isCreatorOpen, setIsCreatorOpen] = useState(false)
     const [selectedStageId, setSelectedStageId] = useState<string | null>(null)
+    const [newGroupName, setNewGroupName] = useState('')
+    const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
+    const [editingGroupName, setEditingGroupName] = useState('')
 
-    const filteredPresets = presets.filter(p =>
+    // Group presets by groupId
+    const ungroupedPresets = presets.filter(p => !p.groupId)
+    const groupedPresets = groups.map(group => ({
+        group,
+        presets: presets.filter(p => p.groupId === group.id)
+    }))
+
+    const filteredUngroupedPresets = ungroupedPresets.filter(p =>
         p.name.toLowerCase().includes(search.toLowerCase())
     )
+
+    const filteredGroupedPresets = groupedPresets.map(g => ({
+        ...g,
+        presets: g.presets.filter(p =>
+            p.name.toLowerCase().includes(search.toLowerCase())
+        )
+    })).filter(g => g.presets.length > 0 || !search)
 
     const handleTogglePreset = (preset: CharacterPreset) => {
         // Check if already on stage
@@ -246,6 +391,24 @@ export function CharacterPromptDialog() {
         } else {
             importFromStart(preset.id)
         }
+    }
+
+    const handleCreateGroup = () => {
+        if (!newGroupName.trim()) return
+        addGroup(newGroupName.trim())
+        setNewGroupName('')
+    }
+
+    const handleSaveGroupName = (groupId: string) => {
+        if (editingGroupName.trim()) {
+            updateGroup(groupId, { name: editingGroupName.trim() })
+        }
+        setEditingGroupId(null)
+        setEditingGroupName('')
+    }
+
+    const handleMoveToGroup = (presetId: string, groupId: string | undefined) => {
+        updatePreset(presetId, { groupId })
     }
 
     const getStateColor = (presetId: string) => {
@@ -299,82 +462,153 @@ export function CharacterPromptDialog() {
                         </div>
 
                         <ScrollArea className="flex-1 p-4">
-                            <div className="grid grid-cols-2 gap-3">
-                                {filteredPresets.map(preset => {
-                                    const isActive = characters.some(c => c.presetId === preset.id)
-                                    const activeColor = getStateColor(preset.id)
+                            <div className="space-y-4">
+                                {/* Create New Group */}
+                                <div className="flex gap-2 items-center">
+                                    <Input
+                                        placeholder={t('characterPromptDialog.newGroupName', '새 폴더 이름...')}
+                                        value={newGroupName}
+                                        onChange={(e) => setNewGroupName(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleCreateGroup()}
+                                        className="h-8 text-sm"
+                                    />
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 px-3 gap-1.5"
+                                        onClick={handleCreateGroup}
+                                        disabled={!newGroupName.trim()}
+                                        title={t('characterPromptDialog.createFolder', '폴더 생성')}
+                                    >
+                                        <FolderPlus className="w-4 h-4" />
+                                        <span className="text-xs">{t('characterPromptDialog.folder', '폴더')}</span>
+                                    </Button>
+                                </div>
 
-                                    return (
-                                        <Card
-                                            key={preset.id}
-                                            className={cn(
-                                                "cursor-pointer transition-all hover:shadow-md group relative overflow-hidden",
-                                                isActive ? "ring-2 ring-primary border-primary bg-primary/5" : "hover:border-primary/50"
-                                            )}
-                                            onClick={() => handleTogglePreset(preset)}
-                                        >
-                                            <CardHeader className="p-3 pb-0 space-y-0">
-                                                <div className="flex justify-between items-start gap-2">
-                                                    <div className="font-bold text-sm truncate leading-tight pr-4" title={preset.name}>
-                                                        {preset.name}
-                                                    </div>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-6 w-6 -mr-1 -mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                onClick={e => e.stopPropagation()}
-                                                            >
-                                                                <MoreVertical className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuItem onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                setEditingPresetId(preset.id)
-                                                            }}>
-                                                                <Edit className="w-4 h-4 mr-2" />
-                                                                {t('common.edit', '편집')}
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                className="text-destructive focus:text-destructive"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    deletePreset(preset.id)
-                                                                }}
-                                                            >
-                                                                <Trash2 className="w-4 h-4 mr-2" />
-                                                                {t('common.delete', '삭제')}
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            </CardHeader>
-                                            <CardContent className="p-3">
-                                                <div className="text-xs text-muted-foreground line-clamp-2 min-h-[2.5em] leading-relaxed">
-                                                    {preset.prompt || <span className="italic opacity-50">No prompt...</span>}
-                                                </div>
-                                            </CardContent>
+                                {/* Grouped Presets */}
+                                {filteredGroupedPresets.map(({ group, presets: groupPresets }) => (
+                                    <div key={group.id} className="space-y-2">
+                                        {/* Group Header */}
+                                        <div className="flex items-center gap-2 group/header">
+                                            <button
+                                                className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex-1 text-left"
+                                                onClick={() => toggleGroupCollapsed(group.id)}
+                                            >
+                                                {group.collapsed ? (
+                                                    <ChevronRight className="w-4 h-4" />
+                                                ) : (
+                                                    <ChevronDown className="w-4 h-4" />
+                                                )}
+                                                {group.collapsed ? (
+                                                    <Folder className="w-4 h-4" />
+                                                ) : (
+                                                    <FolderOpen className="w-4 h-4" />
+                                                )}
+                                                {editingGroupId === group.id ? (
+                                                    <Input
+                                                        autoFocus
+                                                        value={editingGroupName}
+                                                        onChange={(e) => setEditingGroupName(e.target.value)}
+                                                        onBlur={() => handleSaveGroupName(group.id)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleSaveGroupName(group.id)
+                                                            if (e.key === 'Escape') {
+                                                                setEditingGroupId(null)
+                                                                setEditingGroupName('')
+                                                            }
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="h-6 text-sm px-1 py-0 w-32"
+                                                    />
+                                                ) : (
+                                                    <span>{group.name}</span>
+                                                )}
+                                                <span className="text-xs opacity-50">({groupPresets.length})</span>
+                                            </button>
+                                            <div className="opacity-0 group-hover/header:opacity-100 transition-opacity flex gap-1">
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-6 w-6"
+                                                    onClick={() => {
+                                                        setEditingGroupId(group.id)
+                                                        setEditingGroupName(group.name)
+                                                    }}
+                                                >
+                                                    <Edit className="w-3 h-3" />
+                                                </Button>
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-6 w-6 text-destructive hover:text-destructive"
+                                                    onClick={() => deleteGroup(group.id)}
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </Button>
+                                            </div>
+                                        </div>
 
-                                            {/* Active Indicator Badge */}
-                                            {isActive && (
-                                                <div
-                                                    className="absolute top-0 right-0 w-0 h-0 border-l-[24px] border-l-transparent border-t-[24px]"
-                                                    style={{ borderTopColor: activeColor || 'currentColor' }}
+                                        {/* Group Content */}
+                                        {!group.collapsed && (
+                                            <div className="grid grid-cols-2 gap-3 pl-4 border-l-2 border-muted ml-2">
+                                                {groupPresets.map(preset => (
+                                                    <PresetCard
+                                                        key={preset.id}
+                                                        preset={preset}
+                                                        characters={characters}
+                                                        groups={groups}
+                                                        onToggle={handleTogglePreset}
+                                                        onEdit={(id) => setEditingPresetId(id)}
+                                                        onDelete={deletePreset}
+                                                        onMoveToGroup={handleMoveToGroup}
+                                                        getStateColor={getStateColor}
+                                                        t={t}
+                                                    />
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+
+                                {/* Ungrouped Presets */}
+                                {filteredUngroupedPresets.length > 0 && (
+                                    <div className="space-y-2">
+                                        {groups.length > 0 && (
+                                            <div className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                                                <Users className="w-4 h-4" />
+                                                {t('characterPromptDialog.ungrouped', '미분류')}
+                                                <span className="text-xs opacity-50">({filteredUngroupedPresets.length})</span>
+                                            </div>
+                                        )}
+                                        <div className={cn("grid grid-cols-2 gap-3", groups.length > 0 && "pl-4 border-l-2 border-muted ml-2")}>
+                                            {filteredUngroupedPresets.map(preset => (
+                                                <PresetCard
+                                                    key={preset.id}
+                                                    preset={preset}
+                                                    characters={characters}
+                                                    groups={groups}
+                                                    onToggle={handleTogglePreset}
+                                                    onEdit={(id) => setEditingPresetId(id)}
+                                                    onDelete={deletePreset}
+                                                    onMoveToGroup={handleMoveToGroup}
+                                                    getStateColor={getStateColor}
+                                                    t={t}
                                                 />
-                                            )}
-                                            {isActive && (
-                                                <Check className="absolute top-0.5 right-0.5 w-3 h-3 text-white" />
-                                            )}
-                                        </Card>
-                                    )
-                                })}
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
-                                {filteredPresets.length === 0 && (
-                                    <div className="col-span-2 text-center py-8 text-muted-foreground text-sm">
+                                {presets.length === 0 && (
+                                    <div className="text-center py-8 text-muted-foreground text-sm">
                                         <Users className="w-8 h-8 opacity-20 mx-auto mb-2" />
-                                        {search ? '검색 결과가 없습니다.' : '저장된 캐릭터가 없습니다.'}
+                                        {t('characterPromptDialog.noPresets', '저장된 캐릭터가 없습니다.')}
+                                    </div>
+                                )}
+
+                                {presets.length > 0 && filteredUngroupedPresets.length === 0 && filteredGroupedPresets.every(g => g.presets.length === 0) && (
+                                    <div className="text-center py-8 text-muted-foreground text-sm">
+                                        {t('common.noSearchResults', '검색 결과가 없습니다.')}
                                     </div>
                                 )}
                             </div>

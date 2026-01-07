@@ -19,6 +19,7 @@ interface SettingsState {
 
     // UI settings
     promptFontSize: number
+    negativePromptCollapsed: boolean  // 네거티브 프롬프트 접기 상태
 
     // Generation settings
     useStreaming: boolean  // Use streaming API for image generation
@@ -37,6 +38,7 @@ interface SettingsState {
     addCustomResolution: (resolution: Omit<CustomResolution, 'id'>) => void
     removeCustomResolution: (id: string) => void
     setPromptFontSize: (size: number) => void
+    setNegativePromptCollapsed: (collapsed: boolean) => void
     setUseStreaming: (useStreaming: boolean) => void
     setGenerationDelay: (delay: number) => void
     setGeminiApiKey: (key: string) => void
@@ -51,6 +53,7 @@ export const useSettingsStore = create<SettingsState>()(
             autoSave: true,
             customResolutions: [],
             promptFontSize: 16, // Default text-base equivalent approximately
+            negativePromptCollapsed: false, // Default: expanded
             useStreaming: true, // Default: enabled
             generationDelay: 500, // Default: 500ms delay between batch generations
             geminiApiKey: '', // Default: empty
@@ -74,6 +77,7 @@ export const useSettingsStore = create<SettingsState>()(
                 customResolutions: state.customResolutions.filter(r => r.id !== id)
             })),
             setPromptFontSize: (size) => set({ promptFontSize: size }),
+            setNegativePromptCollapsed: (collapsed) => set({ negativePromptCollapsed: collapsed }),
             setUseStreaming: (useStreaming) => set({ useStreaming }),
             setGenerationDelay: (delay) => set({ generationDelay: Math.max(0, Math.min(5000, delay)) }),
             setGeminiApiKey: (key) => set({ geminiApiKey: key }),

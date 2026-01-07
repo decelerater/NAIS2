@@ -10,6 +10,8 @@ export type ShortcutAction =
     | 'navigate:web'
     | 'navigate:library'
     | 'navigate:settings'
+    | 'navigate:next'
+    | 'navigate:prev'
     | 'open:promptGenerator'
     | 'open:fragmentDialog'
     | 'open:parameterSettings'
@@ -37,6 +39,8 @@ const DEFAULT_BINDINGS: Record<ShortcutAction, KeyBinding> = {
     'navigate:web': { key: '4', ctrl: true, label: 'Ctrl+4', description: 'shortcuts.actions.navigateWeb' },
     'navigate:library': { key: '5', ctrl: true, label: 'Ctrl+5', description: 'shortcuts.actions.navigateLibrary' },
     'navigate:settings': { key: '6', ctrl: true, label: 'Ctrl+6', description: 'shortcuts.actions.navigateSettings' },
+    'navigate:next': { key: 'Tab', label: 'Tab', description: 'shortcuts.actions.navigateNext' },
+    'navigate:prev': { key: 'Tab', shift: true, label: 'Shift+Tab', description: 'shortcuts.actions.navigatePrev' },
     'open:promptGenerator': { key: 'g', ctrl: true, label: 'Ctrl+G', description: 'shortcuts.actions.promptGenerator' },
     'open:fragmentDialog': { key: 'f', ctrl: true, label: 'Ctrl+F', description: 'shortcuts.actions.fragmentDialog' },
     'open:parameterSettings': { key: 'p', ctrl: true, label: 'Ctrl+P', description: 'shortcuts.actions.parameterSettings' },
@@ -160,6 +164,8 @@ export const SHORTCUT_ACTIONS: { action: ShortcutAction; category: string }[] = 
     { action: 'navigate:web', category: 'navigation' },
     { action: 'navigate:library', category: 'navigation' },
     { action: 'navigate:settings', category: 'navigation' },
+    { action: 'navigate:next', category: 'navigation' },
+    { action: 'navigate:prev', category: 'navigation' },
     { action: 'open:promptGenerator', category: 'dialog' },
     { action: 'open:fragmentDialog', category: 'dialog' },
     { action: 'open:parameterSettings', category: 'dialog' },

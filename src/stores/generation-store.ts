@@ -17,32 +17,44 @@ const createThumbnail = (base64Image: string, maxSize = 256): Promise<string> =>
     return new Promise((resolve) => {
         const img = new Image()
         img.onload = () => {
-            const canvas = document.createElement('canvas')
-            const ctx = canvas.getContext('2d')!
+            try {
+                const canvas = document.createElement('canvas')
+                const ctx = canvas.getContext('2d')
 
-            // Calculate thumbnail dimensions
-            let width = img.width
-            let height = img.height
-            if (width > height) {
-                if (width > maxSize) {
-                    height = Math.round(height * maxSize / width)
-                    width = maxSize
+                if (!ctx) {
+                    resolve(base64Image) // Fallback to original
+                    return
                 }
-            } else {
-                if (height > maxSize) {
-                    width = Math.round(width * maxSize / height)
-                    height = maxSize
+
+                // Calculate thumbnail dimensions
+                let width = img.width
+                let height = img.height
+                if (width > height) {
+                    if (width > maxSize) {
+                        height = Math.round(height * maxSize / width)
+                        width = maxSize
+                    }
+                } else {
+                    if (height > maxSize) {
+                        width = Math.round(width * maxSize / height)
+                        height = maxSize
+                    }
                 }
+
+                canvas.width = width
+                canvas.height = height
+                ctx.drawImage(img, 0, 0, width, height)
+
+                // Use JPEG for smaller size (~10-30KB instead of 2-5MB)
+                const thumbnail = canvas.toDataURL('image/jpeg', 0.7)
+                resolve(thumbnail)
+            } catch {
+                resolve(base64Image) // Fallback to original
             }
-
-            canvas.width = width
-            canvas.height = height
-            ctx.drawImage(img, 0, 0, width, height)
-
-            // Use JPEG for smaller size (~10-30KB instead of 2-5MB)
-            resolve(canvas.toDataURL('image/jpeg', 0.7))
         }
-        img.onerror = () => resolve(base64Image) // Fallback to original
+        img.onerror = () => {
+            resolve(base64Image) // Fallback to original
+        }
         img.src = base64Image
     })
 }
@@ -532,6 +544,17 @@ export const useGenerationStore = create<GenerationState>()(
                                     document.body.appendChild(link)
                                     link.click()
                                     document.body.removeChild(link)
+                                }
+                            } else {
+                                // Auto-save is OFF: Still notify HistoryPanel with memory-based path
+                                // This allows viewing the generated image in history without saving to disk
+                                try {
+                                    const memoryPath = `memory://NAIS_${Date.now()}.png`
+                                    window.dispatchEvent(new CustomEvent('newImageGenerated', {
+                                        detail: { path: memoryPath, data: imageUrl }
+                                    }))
+                                } catch (e) {
+                                    console.warn('Failed to dispatch newImageGenerated event:', e)
                                 }
                             }
 

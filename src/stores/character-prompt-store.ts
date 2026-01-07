@@ -30,18 +30,38 @@ export const CHARACTER_COLORS = [
     '#06b6d4', // Cyan
 ]
 
+// Folder color palette
+export const FOLDER_COLORS = [
+    { name: 'amber', icon: 'text-amber-500', border: 'border-amber-500/40', bg: 'bg-amber-500/10' },
+    { name: 'blue', icon: 'text-blue-500', border: 'border-blue-500/40', bg: 'bg-blue-500/10' },
+    { name: 'green', icon: 'text-green-500', border: 'border-green-500/40', bg: 'bg-green-500/10' },
+    { name: 'purple', icon: 'text-purple-500', border: 'border-purple-500/40', bg: 'bg-purple-500/10' },
+    { name: 'pink', icon: 'text-pink-500', border: 'border-pink-500/40', bg: 'bg-pink-500/10' },
+    { name: 'cyan', icon: 'text-cyan-500', border: 'border-cyan-500/40', bg: 'bg-cyan-500/10' },
+    { name: 'red', icon: 'text-red-500', border: 'border-red-500/40', bg: 'bg-red-500/10' },
+]
+
 export interface CharacterPreset {
     id: string
     name: string
     prompt: string
     negative: string
     image?: string // Base64 or URL
+    groupId?: string // Group/folder ID
+}
+
+export interface CharacterGroup {
+    id: string
+    name: string
+    collapsed: boolean // 폴더 접기 상태
+    colorIndex: number // 폴더 색상 인덱스 (FOLDER_COLORS)
 }
 
 export interface CharacterPrompt {
     id: string
     name?: string         // Character name (optional)
     presetId?: string // Link to origin preset
+    groupId?: string  // Folder groupId for stage organization
     prompt: string        // Character-specific tags
     negative: string      // Character-specific negative tags
     enabled: boolean
@@ -51,6 +71,7 @@ export interface CharacterPrompt {
 interface CharacterPromptState {
     characters: CharacterPrompt[]
     presets: CharacterPreset[]
+    groups: CharacterGroup[]
     positionEnabled: boolean // 위치 기능 활성화 여부
 
     // Active Characters (Stage)
@@ -68,13 +89,23 @@ interface CharacterPromptState {
     updatePreset: (id: string, data: Partial<CharacterPreset>) => void
     deletePreset: (id: string) => void
     importFromStart: (presetId: string) => void // Add preset to stage
+
+    // Groups (Folders)
+    addGroup: (name: string) => void
+    updateGroup: (id: string, data: Partial<CharacterGroup>) => void
+    deleteGroup: (id: string) => void
+    toggleGroupCollapsed: (id: string) => void
+    toggleGroupEnabled: (groupId: string) => void // 그룹 내 모든 캐릭터 활성화/비활성화
+    moveCharacterToGroup: (characterId: string, groupId: string | undefined) => void
+    saveCharacterAsPreset: (characterId: string) => void
 }
 
 export const useCharacterPromptStore = create<CharacterPromptState>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             characters: [],
             presets: [],
+            groups: [],
             positionEnabled: false, // 기본값: 비활성화
 
             addCharacter: (initialData?: Partial<CharacterPrompt>) => {
@@ -185,6 +216,87 @@ export const useCharacterPromptStore = create<CharacterPromptState>()(
                         ]
                     }
                 })
+            },
+
+            // Group Actions
+            addGroup: (name) => {
+                const newId = Date.now().toString() + Math.random().toString(36).substr(2, 9)
+                set(state => ({
+                    groups: [...state.groups, { id: newId, name, collapsed: false, colorIndex: 0 }]
+                }))
+            },
+
+            updateGroup: (id, data) => {
+                set(state => ({
+                    groups: state.groups.map(g =>
+                        g.id === id ? { ...g, ...data } : g
+                    )
+                }))
+            },
+
+            deleteGroup: (id) => {
+                set(state => ({
+                    // Remove group and unassign characters/presets from the group
+                    groups: state.groups.filter(g => g.id !== id),
+                    characters: state.characters.map(c =>
+                        c.groupId === id ? { ...c, groupId: undefined } : c
+                    ),
+                    presets: state.presets.map(p =>
+                        p.groupId === id ? { ...p, groupId: undefined } : p
+                    )
+                }))
+            },
+
+            toggleGroupCollapsed: (id) => {
+                set(state => ({
+                    groups: state.groups.map(g =>
+                        g.id === id ? { ...g, collapsed: !g.collapsed } : g
+                    )
+                }))
+            },
+
+            toggleGroupEnabled: (groupId) => {
+                // 그룹 내 캐릭터들의 enabled 토글
+                const { characters } = get()
+                
+                // 그룹 내 캐릭터들 중 하나라도 활성화되어 있으면 전부 비활성화, 아니면 전부 활성화
+                const groupCharacters = characters.filter(c => c.groupId === groupId)
+                const allEnabled = groupCharacters.length > 0 && groupCharacters.every(c => c.enabled)
+                const newEnabled = !allEnabled
+
+                set(state => ({
+                    characters: state.characters.map(c =>
+                        c.groupId === groupId
+                            ? { ...c, enabled: newEnabled }
+                            : c
+                    )
+                }))
+            },
+
+            moveCharacterToGroup: (characterId, groupId) => {
+                set(state => ({
+                    characters: state.characters.map(c =>
+                        c.id === characterId ? { ...c, groupId } : c
+                    )
+                }))
+            },
+
+            saveCharacterAsPreset: (characterId) => {
+                const { characters } = get()
+                const char = characters.find(c => c.id === characterId)
+                if (!char) return
+
+                const newId = Date.now().toString() + Math.random().toString(36).substr(2, 9)
+                const presetName = char.name || char.prompt.split(',')[0]?.trim() || 'Unnamed'
+
+                set(state => ({
+                    presets: [...state.presets, {
+                        id: newId,
+                        name: presetName,
+                        prompt: char.prompt,
+                        negative: char.negative,
+                    }]
+                }))
             }
         }),
         {

@@ -26,7 +26,7 @@ import { Command } from '@tauri-apps/plugin-shell'
 import { MetadataDialog } from '@/components/metadata/MetadataDialog'
 import { ImageReferenceDialog } from '@/components/metadata/ImageReferenceDialog'
 import { pictureDir, join } from '@tauri-apps/api/path'
-import { exists, readFile } from '@tauri-apps/plugin-fs'
+import { exists, readFile, remove } from '@tauri-apps/plugin-fs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { toast } from '@/components/ui/use-toast'
 
@@ -81,7 +81,9 @@ export default function SceneDetail() {
     const [isEditingName, setIsEditingName] = useState(false)
     const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
     const [viewerImageSrc, setViewerImageSrc] = useState<string | null>(null)
-    const { streamingSceneId, streamingImage, streamingProgress } = useSceneStore()
+    const streamingSceneId = useSceneStore(s => s.streamingSceneId)
+    const streamingImage = useSceneStore(s => s.streamingSceneId === sceneId ? s.streamingImage : null)
+    const streamingProgress = useSceneStore(s => s.streamingSceneId === sceneId ? s.streamingProgress : 0)
     const thumbnailLayout = useSceneStore(s => s.thumbnailLayout)
 
     // Auto-save prompt logic - hooks must be before conditional return
@@ -114,7 +116,7 @@ export default function SceneDetail() {
         }
     }, [scene?.id])
 
-    // Debounced save of prompt to store
+    // Debounced save of prompt to store + save on unmount
     useEffect(() => {
         if (!scene || !activePresetId) return
         if (localPrompt === scene.scenePrompt) return
@@ -123,10 +125,23 @@ export default function SceneDetail() {
             updateScenePrompt(activePresetId, scene.id, localPrompt)
         }, 1000)
 
-        return () => clearTimeout(timer)
+        return () => {
+            clearTimeout(timer)
+            // Save immediately on unmount if changed
+            const currentScene = useSceneStore.getState().presets
+                .find(p => p.id === activePresetId)?.scenes
+                .find(s => s.id === scene.id)
+            if (currentScene && localPrompt !== currentScene.scenePrompt) {
+                updateScenePrompt(activePresetId, scene.id, localPrompt)
+            }
+        }
     }, [localPrompt, scene, activePresetId, updateScenePrompt])
 
     const handleBack = () => {
+        // Save prompt immediately before leaving
+        if (scene && activePresetId && localPrompt !== scene.scenePrompt) {
+            updateScenePrompt(activePresetId, scene.id, localPrompt)
+        }
         nav('/scenes')
     }
 
@@ -371,9 +386,17 @@ export default function SceneDetail() {
                             variant="outline"
                             size="sm"
                             className="h-7 rounded-lg gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => {
+                            onClick={async () => {
                                 if (activePresetId && sceneId) {
-                                    const count = deleteNonFavoriteImages(activePresetId, sceneId)
+                                    const { count, paths } = deleteNonFavoriteImages(activePresetId, sceneId)
+                                    // Delete actual files
+                                    for (const filePath of paths) {
+                                        try {
+                                            await remove(filePath)
+                                        } catch (e) {
+                                            console.warn('Failed to delete file:', filePath, e)
+                                        }
+                                    }
                                     if (count > 0) {
                                         toast({ description: t('scene.deletedNonFavorites', '{{count}}개 이미지 삭제됨', { count }) })
                                     }
@@ -497,7 +520,7 @@ export default function SceneDetail() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute top-4 right-4 text-white hover:bg-white/20 h-10 w-10"
+                        className="absolute top-4 right-4 text-white bg-black/50 hover:bg-black/70 rounded-lg h-10 w-10"
                         onClick={() => setViewerImageSrc(null)}
                     >
                         <X className="h-6 w-6" />

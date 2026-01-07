@@ -15,6 +15,9 @@ export const SHORTCUT_EVENTS = {
     RESET_FRAGMENT_COUNTERS: 'shortcut:resetFragmentCounters',
 }
 
+// 메뉴 순서 정의
+const MENU_ROUTES = ['/', '/scenes', '/tools', '/web', '/library', '/settings']
+
 export function useShortcuts() {
     const navigate = useNavigate()
     const location = useLocation()
@@ -36,6 +39,8 @@ export function useShortcuts() {
                 'navigate:web',
                 'navigate:library',
                 'navigate:settings',
+                'navigate:next',
+                'navigate:prev',
                 'open:promptGenerator',
                 'open:fragmentDialog',
                 'open:parameterSettings',
@@ -54,6 +59,23 @@ export function useShortcuts() {
                     // 네비게이션은 입력 필드에서도 작동
                     if (action.startsWith('navigate:')) {
                         e.preventDefault()
+                        
+                        // 다음/이전 메뉴 이동
+                        if (action === 'navigate:next' || action === 'navigate:prev') {
+                            const currentPath = location.pathname.startsWith('/scenes/') ? '/scenes' : location.pathname
+                            const currentIndex = MENU_ROUTES.indexOf(currentPath)
+                            if (currentIndex === -1) return
+                            
+                            let nextIndex: number
+                            if (action === 'navigate:next') {
+                                nextIndex = (currentIndex + 1) % MENU_ROUTES.length
+                            } else {
+                                nextIndex = (currentIndex - 1 + MENU_ROUTES.length) % MENU_ROUTES.length
+                            }
+                            navigate(MENU_ROUTES[nextIndex])
+                            return
+                        }
+                        
                         const routes: Record<string, string> = {
                             'navigate:main': '/',
                             'navigate:scenes': '/scenes',

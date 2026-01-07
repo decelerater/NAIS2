@@ -41,6 +41,8 @@ import {
     Film,
     Puzzle,
     Users,
+    ChevronDown,
+    ChevronUp,
 } from 'lucide-react'
 import GeminiIcon from '@/assets/gemini-color.svg'
 import { useGenerationStore, AVAILABLE_MODELS } from '@/stores/generation-store'
@@ -125,6 +127,8 @@ export function PromptPanel() {
 
     // Zustand 선택적 구독 - settingsStore
     const promptFontSize = useSettingsStore(state => state.promptFontSize)
+    const negativePromptCollapsed = useSettingsStore(state => state.negativePromptCollapsed)
+    const setNegativePromptCollapsed = useSettingsStore(state => state.setNegativePromptCollapsed)
 
     // Zustand 선택적 구독 - characterPromptStore
     const characterCount = useCharacterPromptStore(state => state.characters.filter(c => c.enabled).length)
@@ -200,8 +204,8 @@ export function PromptPanel() {
                     onOpenChange={setCharacterPanelOpen}
                 />
 
-                {/* Base Prompt - 30% */}
-                <div className="flex flex-col min-h-0 basis-[30%]">
+                {/* Base Prompt - 30% (expands when negative collapsed) */}
+                <div className={cn("flex flex-col min-h-0 basis-[30%]", negativePromptCollapsed && "flex-1")}>
                     <label className="text-xs font-medium text-muted-foreground mb-1">{t('prompt.base')}</label>
                     <AutocompleteTextarea
                         placeholder={t('prompt.basePlaceholder')}
@@ -212,8 +216,8 @@ export function PromptPanel() {
                     />
                 </div>
 
-                {/* Additional Prompt - 25% */}
-                <div className="flex flex-col min-h-0 basis-[25%]">
+                {/* Additional Prompt - 25% (expands when negative collapsed) */}
+                <div className={cn("flex flex-col min-h-0 basis-[25%]", negativePromptCollapsed && "flex-1")}>
                     <label className="text-xs font-medium text-muted-foreground mb-1">{t('prompt.additional')}</label>
                     <AutocompleteTextarea
                         placeholder={t('prompt.additionalPlaceholder')}
@@ -224,8 +228,8 @@ export function PromptPanel() {
                     />
                 </div>
 
-                {/* Detail Prompt - 25% */}
-                <div className="flex flex-col min-h-0 basis-[25%]">
+                {/* Detail Prompt - 25% (expands when negative collapsed) */}
+                <div className={cn("flex flex-col min-h-0 basis-[25%]", negativePromptCollapsed && "flex-1")}>
                     <label className="text-xs font-medium text-muted-foreground mb-1">{t('prompt.detail')}</label>
                     <AutocompleteTextarea
                         placeholder={t('prompt.detailPlaceholder')}
@@ -236,16 +240,37 @@ export function PromptPanel() {
                     />
                 </div>
 
-                {/* Negative Prompt - 20% */}
-                <div className="flex flex-col min-h-0 basis-[20%]">
-                    <label className="text-xs font-medium text-destructive/80 mb-1">{t('prompt.negative')}</label>
-                    <AutocompleteTextarea
-                        placeholder={t('prompt.negativePlaceholder')}
-                        value={negativePrompt}
-                        onChange={(e) => setNegativePrompt(e.target.value)}
-                        className="flex-1 min-h-0 resize-none rounded-xl border-destructive/20"
-                        style={{ fontSize: `${promptFontSize}px` }}
-                    />
+                {/* Negative Prompt - 20% (collapsible, collapses downward) */}
+                <div className={cn(
+                    "flex flex-col transition-all duration-200 overflow-hidden",
+                    negativePromptCollapsed ? "flex-none h-[28px]" : "min-h-0 basis-[20%]"
+                )}>
+                    <button
+                        type="button"
+                        onClick={() => setNegativePromptCollapsed(!negativePromptCollapsed)}
+                        className="flex items-center gap-1 text-xs font-medium text-destructive/80 mb-1 hover:text-destructive cursor-pointer flex-shrink-0"
+                    >
+                        {negativePromptCollapsed ? (
+                            <ChevronDown className="h-3 w-3" />
+                        ) : (
+                            <ChevronUp className="h-3 w-3" />
+                        )}
+                        {t('prompt.negative')}
+                        {negativePromptCollapsed && negativePrompt && (
+                            <span className="text-muted-foreground font-normal truncate max-w-[200px]">
+                                - {negativePrompt.split(',')[0]}...
+                            </span>
+                        )}
+                    </button>
+                    {!negativePromptCollapsed && (
+                        <AutocompleteTextarea
+                            placeholder={t('prompt.negativePlaceholder')}
+                            value={negativePrompt}
+                            onChange={(e) => setNegativePrompt(e.target.value)}
+                            className="flex-1 min-h-0 resize-none rounded-xl border-destructive/20"
+                            style={{ fontSize: `${promptFontSize}px` }}
+                        />
+                    )}
                 </div>
             </div>
 

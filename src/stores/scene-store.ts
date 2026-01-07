@@ -62,7 +62,7 @@ interface SceneState {
     addImageToScene: (presetId: string, sceneId: string, imageUrl: string) => void
     toggleFavorite: (presetId: string, sceneId: string, imageId: string) => void
     deleteImage: (presetId: string, sceneId: string, imageId: string) => void
-    deleteNonFavoriteImages: (presetId: string, sceneId: string) => number
+    deleteNonFavoriteImages: (presetId: string, sceneId: string) => { count: number; paths: string[] }
     getSceneThumbnail: (scene: SceneCard) => string | undefined
 
     // Actions - Generation
@@ -423,9 +423,14 @@ export const useSceneStore = create<SceneState>()(
             deleteNonFavoriteImages: (presetId, sceneId) => {
                 const preset = get().presets.find(p => p.id === presetId)
                 const scene = preset?.scenes.find(s => s.id === sceneId)
-                if (!scene) return 0
+                if (!scene) return { count: 0, paths: [] }
                 
-                const nonFavoriteCount = scene.images.filter(img => !img.isFavorite).length
+                const nonFavorites = scene.images.filter(img => !img.isFavorite)
+                const nonFavoriteCount = nonFavorites.length
+                // Collect file paths (non-base64 URLs) for deletion
+                const filePaths = nonFavorites
+                    .map(img => img.url)
+                    .filter(url => !url.startsWith('data:'))
                 
                 set(state => ({
                     presets: state.presets.map(p =>
@@ -442,7 +447,7 @@ export const useSceneStore = create<SceneState>()(
                     ),
                 }))
                 
-                return nonFavoriteCount
+                return { count: nonFavoriteCount, paths: filePaths }
             },
 
             getSceneThumbnail: (scene) => {
@@ -472,12 +477,22 @@ export const useSceneStore = create<SceneState>()(
             streamingImage: null,
             streamingProgress: 0,
             setStreamingData: (sceneId, image, progress) => {
-                // If image is null, keep existing streamingImage (progress-only update)
-                set({
-                    streamingSceneId: sceneId,
-                    streamingImage: image ?? get().streamingImage,
-                    streamingProgress: progress
-                })
+                const currentSceneId = get().streamingSceneId
+                // If sceneId changed, reset image to prevent showing previous scene's image
+                if (sceneId !== currentSceneId) {
+                    set({
+                        streamingSceneId: sceneId,
+                        streamingImage: image,
+                        streamingProgress: progress
+                    })
+                } else {
+                    // Same scene - if image is null, keep existing (progress-only update)
+                    set({
+                        streamingSceneId: sceneId,
+                        streamingImage: image ?? get().streamingImage,
+                        streamingProgress: progress
+                    })
+                }
             },
 
             // History Refresh Trigger
