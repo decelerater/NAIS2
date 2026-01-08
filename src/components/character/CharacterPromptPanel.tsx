@@ -617,8 +617,8 @@ function SortableCharacterCard(props: CharacterCardProps) {
     }
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-            <CharacterCard {...props} />
+        <div ref={setNodeRef} style={style} {...attributes}>
+            <CharacterCard {...props} dragHandleProps={listeners} />
         </div>
     )
 }
@@ -637,6 +637,7 @@ interface CharacterCardProps {
     onMoveToGroup: (characterId: string, groupId: string | undefined) => void
     positionEnabled: boolean
     groups: { id: string; name: string; collapsed: boolean }[]
+    dragHandleProps?: React.HTMLAttributes<HTMLElement>
 }
 
 function CharacterCard({
@@ -652,6 +653,7 @@ function CharacterCard({
     onMoveToGroup,
     positionEnabled,
     groups,
+    dragHandleProps,
 }: CharacterCardProps) {
     const color = CHARACTER_COLORS[index % CHARACTER_COLORS.length]
     const { t } = useTranslation()
@@ -718,10 +720,11 @@ function CharacterCard({
                             !character.enabled && "opacity-50"
                         )}
                     >
-                        {/* Card Header */}
+                        {/* Card Header - Drag Handle */}
                         <div
-                            className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors bg-muted/30"
+                            className="flex items-center gap-2.5 px-3 py-2.5 cursor-grab hover:bg-muted/50 transition-colors bg-muted/30 active:cursor-grabbing"
                             onClick={onToggleExpand}
+                            {...dragHandleProps}
                         >
                             {/* 캐릭터 아이콘 */}
                             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
