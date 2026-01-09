@@ -7,6 +7,7 @@ import { Slider } from '@/components/ui/slider'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/use-toast'
+import { Tip } from '@/components/ui/tooltip'
 import { smartTools, TagResult } from '@/services/smart-tools'
 
 
@@ -225,15 +226,16 @@ export function SmartToolsPanel({ imageUrl, onClose, onUpdateImage }: SmartTools
                             <Tags className="h-5 w-5 text-blue-400" />
                             <span className="font-medium text-sm">{t('smartTools.tagger', '태그 분석')}</span>
                         </div>
-                        <Button
-                            className="w-full"
-                            variant="secondary"
-                            onClick={handleAnalyzeTags}
-                            disabled={isLoading || !processedImage || !isTaggerAvailable}
-                            title={isTaggerAvailable ? "" : "Tagger binary (tagger-server) not found in app directory."}
-                        >
-                            {isCheckingTagger ? "Checking..." : (isTaggerAvailable ? t('smartTools.runTagger', '태그 분석 실행') : t('smartTools.taggerUnavailable', '태그 실행 파일 없음'))}
-                        </Button>
+                        <Tip content={!isTaggerAvailable ? "Tagger binary (tagger-server) not found in app directory." : undefined}>
+                            <Button
+                                className="w-full"
+                                variant="secondary"
+                                onClick={handleAnalyzeTags}
+                                disabled={isLoading || !processedImage || !isTaggerAvailable}
+                            >
+                                {isCheckingTagger ? "Checking..." : (isTaggerAvailable ? t('smartTools.runTagger', '태그 분석 실행') : t('smartTools.taggerUnavailable', '태그 실행 파일 없음'))}
+                            </Button>
+                        </Tip>
 
                         {/* Tags Display */}
                         {tags.length > 0 && activeTool === 'tagger' && (

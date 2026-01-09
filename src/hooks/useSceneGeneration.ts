@@ -129,9 +129,12 @@ export function useSceneGeneration() {
                 // Determine Seed (Randomize if not locked)
                 const finalSeed = genState.seedLocked ? genState.seed : Math.floor(Math.random() * 4294967295)
 
+                // Helper function to round to nearest multiple of 64 (NovelAI requirement)
+                const roundTo64 = (value: number): number => Math.round(value / 64) * 64
+
                 // For I2I and Inpainting, use source image dimensions instead of scene/global resolution
-                let finalWidth = scene.width || genState.selectedResolution.width
-                let finalHeight = scene.height || genState.selectedResolution.height
+                let finalWidth = roundTo64(scene.width || genState.selectedResolution.width)
+                let finalHeight = roundTo64(scene.height || genState.selectedResolution.height)
 
                 if (genState.sourceImage) {
                     // Extract dimensions from base64 image
@@ -142,9 +145,10 @@ export function useSceneGeneration() {
                             img.onerror = () => reject(new Error('Failed to load source image'))
                             img.src = genState.sourceImage!
                         })
-                        finalWidth = img.width
-                        finalHeight = img.height
-                        console.log(`[SceneGeneration] Using source image dimensions: ${finalWidth}x${finalHeight}`)
+                        // Round source image dimensions to multiples of 64
+                        finalWidth = roundTo64(img.width)
+                        finalHeight = roundTo64(img.height)
+                        console.log(`[SceneGeneration] Using source image dimensions: ${img.width}x${img.height} → ${finalWidth}x${finalHeight}`)
                     } catch (e) {
                         console.warn('[SceneGeneration] Failed to get source image dimensions, using scene/global resolution')
                     }

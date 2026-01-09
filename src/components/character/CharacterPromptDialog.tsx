@@ -26,6 +26,7 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu'
+import { Tip } from '@/components/ui/tooltip'
 import { useCharacterPromptStore, CHARACTER_COLORS, CharacterPrompt, CharacterPreset, CharacterGroup } from '@/stores/character-prompt-store'
 import { cn } from '@/lib/utils'
 
@@ -472,17 +473,18 @@ export function CharacterPromptDialog() {
                                         onKeyDown={(e) => e.key === 'Enter' && handleCreateGroup()}
                                         className="h-8 text-sm"
                                     />
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-8 px-3 gap-1.5"
-                                        onClick={handleCreateGroup}
-                                        disabled={!newGroupName.trim()}
-                                        title={t('characterPromptDialog.createFolder', '폴더 생성')}
-                                    >
-                                        <FolderPlus className="w-4 h-4" />
-                                        <span className="text-xs">{t('characterPromptDialog.folder', '폴더')}</span>
-                                    </Button>
+                                    <Tip content={t('characterPromptDialog.createFolder', '폴더 생성')}>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-8 px-3 gap-1.5"
+                                            onClick={handleCreateGroup}
+                                            disabled={!newGroupName.trim()}
+                                        >
+                                            <FolderPlus className="w-4 h-4" />
+                                            <span className="text-xs">{t('characterPromptDialog.folder', '폴더')}</span>
+                                        </Button>
+                                    </Tip>
                                 </div>
 
                                 {/* Grouped Presets */}

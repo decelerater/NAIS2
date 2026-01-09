@@ -6,6 +6,7 @@ import { Slider } from '@/components/ui/slider'
 import { Label } from '@/components/ui/label'
 import { useGenerationStore } from '@/stores/generation-store'
 import { InpaintingDialog } from '@/components/tools/InpaintingDialog'
+import { Tip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 export function SourceImagePanel() {
@@ -61,25 +62,27 @@ export function SourceImagePanel() {
                     <div className="flex items-center gap-1">
                         {/* Edit Mask Button (only for Inpaint) */}
                         {isInpaint && (
+                            <Tip content={t('sourcePanel.editMask', '마스크 영역 편집')}>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 rounded-full hover:bg-pink-500/20 hover:text-pink-400"
+                                    onClick={() => setInpaintDialogOpen(true)}
+                                >
+                                    <Edit3 className="h-3.5 w-3.5" />
+                                </Button>
+                            </Tip>
+                        )}
+                        <Tip content={t('sourcePanel.cancel', '취소하고 T2I로 돌아가기')}>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-6 w-6 rounded-full hover:bg-pink-500/20 hover:text-pink-400"
-                                onClick={() => setInpaintDialogOpen(true)}
-                                title={t('sourcePanel.editMask', '마스크 편집')}
+                                className="h-6 w-6 rounded-full hover:bg-destructive/20 hover:text-destructive"
+                                onClick={handleCancel}
                             >
-                                <Edit3 className="h-3.5 w-3.5" />
+                                <X className="h-3.5 w-3.5" />
                             </Button>
-                        )}
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 rounded-full hover:bg-destructive/20 hover:text-destructive"
-                            onClick={handleCancel}
-                            title={t('sourcePanel.cancel', '취소하고 T2I로 돌아가기')}
-                        >
-                            <X className="h-3.5 w-3.5" />
-                        </Button>
+                        </Tip>
                     </div>
                 </div>
 

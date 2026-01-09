@@ -375,9 +375,12 @@ export const useGenerationStore = create<GenerationState>()(
                         // Check if streaming is enabled
                         const { useStreaming } = useSettingsStore.getState()
 
+                        // Helper function to round to nearest multiple of 64 (NovelAI requirement)
+                        const roundTo64 = (value: number): number => Math.round(value / 64) * 64
+
                         // For I2I and Inpainting, use source image dimensions instead of global resolution
-                        let finalWidth = selectedResolution.width
-                        let finalHeight = selectedResolution.height
+                        let finalWidth = roundTo64(selectedResolution.width)
+                        let finalHeight = roundTo64(selectedResolution.height)
 
                         if (sourceImage) {
                             // Extract dimensions from base64 image
@@ -388,9 +391,10 @@ export const useGenerationStore = create<GenerationState>()(
                                     img.onerror = () => reject(new Error('Failed to load source image'))
                                     img.src = sourceImage
                                 })
-                                finalWidth = img.width
-                                finalHeight = img.height
-                                console.log(`[Generate] Using source image dimensions: ${finalWidth}x${finalHeight}`)
+                                // Round source image dimensions to multiples of 64
+                                finalWidth = roundTo64(img.width)
+                                finalHeight = roundTo64(img.height)
+                                console.log(`[Generate] Using source image dimensions: ${img.width}x${img.height} → ${finalWidth}x${finalHeight}`)
                             } catch (e) {
                                 console.warn('[Generate] Failed to get source image dimensions, using global resolution')
                             }

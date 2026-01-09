@@ -104,13 +104,16 @@
         "presetDefault": "デフォルトプリセット",
         "deleteSelected": "選択削除",
         "moveToPreset": "プリセットへ移動",
-        "exportSelectedZip": "選択ZIPエクスポート",
+        "exportSelectedZip": "選択シーン画像ZIP出力",
         "importJson": "JSONインポート",
-        "exportJson": "JSONエクスポート",
-        "thumbnailLayout": "サムネイル配置",
+        "exportJson": "シーンデータJSON出力",
+        "thumbnailLayout": "縦/横サムネイル切替",
         "deleteNonFavorites": "お気に入り以外を削除",
         "deletedNonFavorites": "{{count}}枚の画像を削除しました",
-        "noImages": "生成された画像がありません"
+        "noImages": "生成された画像がありません",
+        "applyResolution": "選択シーンに解像度適用",
+        "gridColumnsDesc": "グリッド列数変更",
+        "deletePreset": "プリセット削除"
     },
     "preset": {
         "default": "デフォルト",
@@ -353,11 +356,16 @@
         "clear": "初期化",
         "addAsRef": "画像参照",
         "saveAs": "保存",
-        "openFolder": "フォルダを開く",
+        "openFolder": "生成画像フォルダを開く",
         "rename": "名前変更",
         "copied": "コピーしました",
         "copyFailed": "コピー失敗",
-        "deleted": "削除しました"
+        "deleted": "削除しました",
+        "back": "シーン一覧に戻る"
+    },
+    "layout": {
+        "toggleLeftSidebar": "左サイドバー切替",
+        "toggleRightSidebar": "右サイドバー切替"
     },
     "resolutions": {
         "portrait": "縦長",
@@ -367,10 +375,11 @@
         "wideLandscape": "横長大",
         "custom": "カスタム",
         "addCustom": "カスタム解像度を追加",
-        "addCustomDesc": "新しい解像度プリセットを追加します",
+        "addCustomDesc": "新しい解像度プリセットを追加します（64の倍数に自動調整）",
         "presetName": "プリセット名",
         "width": "幅",
-        "height": "高さ"
+        "height": "高さ",
+        "finalResolution": "最終解像度"
     },
     "library": {
         "title": "ライブラリ",
@@ -395,9 +404,14 @@
         "renameDesc": "選択した画像の新しい名前を入力してください。",
         "dropHint": "画像をドラッグ＆ドロップして追加",
         "createStack": "スタック作成",
+        "createStackDesc": "選択画像をスタックにまとめる",
         "unstack": "スタック解除",
+        "unstackDesc": "スタックを個別画像に分離",
         "stackCount": "{{count}}枚",
-        "import": "画像インポート"
+        "import": "画像インポート",
+        "importDesc": "画像ファイルを読み込み",
+        "editModeDesc": "複数画像を選択して一括編集",
+        "gridColumnsDesc": "グリッド列数変更"
     },
     "settingsPage": {
         "title": "設定",
@@ -597,15 +611,18 @@
         "rename": "名前変更",
         "namePlaceholder": "キャラクター名を入力...",
         "duplicate": "複製",
-        "positionTitle": "キャラクター位置指定",
+        "positionTitle": "画像内のキャラクター位置指定",
+        "positionDesc": "キャラクター位置機能を有効化",
         "positionHelp": "キャラクターをドラッグして位置を指定",
         "noActiveCharacters": "有効なキャラクターがありません",
+        "addDesc": "新規キャラクタープロンプト追加",
+        "addFolderDesc": "キャラクターフォルダ作成",
         "search": "キャラクター検索...",
         "noResults": "検索結果がありません",
         "newFolder": "新規フォルダ...",
         "emptyFolder": "空のフォルダ",
         "ungrouped": "未分類",
-        "toggleAll": "全体切替",
+        "toggleAll": "フォルダ内全体有効/無効化",
         "saveAsPreset": "プリセットとして保存",
         "savedAsPreset": "プリセットとして保存しました",
         "moveToFolder": "フォルダに移動",

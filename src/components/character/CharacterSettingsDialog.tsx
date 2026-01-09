@@ -13,6 +13,7 @@ import { Users, Upload, X, Zap, Database, Lock } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Slider } from '@/components/ui/slider'
 import { Label } from '@/components/ui/label'
+import { Tip } from '@/components/ui/tooltip'
 import { useCharacterStore, ReferenceImage } from '@/stores/character-store'
 import { parseMetadataFromBase64 } from '@/lib/metadata-parser'
 
@@ -154,9 +155,11 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
                         </Button>
                         {/* Pre-encoded indicator */}
                         {img.encodedVibe && (
-                            <div className="absolute bottom-1 left-1 bg-green-500/90 text-white text-[9px] font-bold rounded px-1 py-0.5 flex items-center gap-0.5" title={t('characterDialog.preEncodedTooltip')}>
-                                <Zap className="w-2.5 h-2.5" />
-                            </div>
+                            <Tip content={t('characterDialog.preEncodedTooltip')}>
+                                <div className="absolute bottom-1 left-1 bg-green-500/90 text-white text-[9px] font-bold rounded px-1 py-0.5 flex items-center gap-0.5">
+                                    <Zap className="w-2.5 h-2.5" />
+                                </div>
+                            </Tip>
                         )}
                     </div>
                     <div className="flex-1 space-y-3 min-w-0">

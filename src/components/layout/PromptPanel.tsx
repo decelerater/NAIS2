@@ -30,6 +30,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { Tip } from '@/components/ui/tooltip'
 import { generateRandomSeed } from '@/lib/utils'
 import {
     ImagePlus,
@@ -311,15 +312,16 @@ export function PromptPanel() {
                     {t('prompt.fragment')}
                 </Button>
                 {/* AI Prompt Generator Button */}
-                <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 rounded-xl shrink-0 hover:bg-accent"
-                    onClick={() => setPromptGenOpen(true)}
-                    title={t('promptGenerator.button', 'AI 프롬프트')}
-                >
-                    <img src={GeminiIcon} alt="Gemini" className="h-5 w-5" />
-                </Button>
+                <Tip content={t('promptGenerator.desc', 'Gemini AI로 프롬프트 생성')}>
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 rounded-xl shrink-0 hover:bg-accent"
+                        onClick={() => setPromptGenOpen(true)}
+                    >
+                        <img src={GeminiIcon} alt="Gemini" className="h-5 w-5" />
+                    </Button>
+                </Tip>
                 {/* Parameter Settings Dialog */}
                 <Dialog open={parameterDialogOpen} onOpenChange={setParameterDialogOpen}>
                     <DialogTrigger asChild>

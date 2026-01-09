@@ -25,6 +25,7 @@ import {
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
+    Tip,
 } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -435,36 +436,41 @@ export function FragmentPromptDialog({ open, onOpenChange }: FragmentPromptDialo
                     {/* 왼쪽: 파일 트리 */}
                     <div className="w-64 flex flex-col border rounded-lg">
                         <div className="p-2 border-b flex gap-1">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleCreateFile()}
-                                title={t('fragment.newFile', '새 파일')}
-                            >
-                                <Plus className="h-4 w-4" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setIsCreatingFolder(true)}
-                                title={t('fragment.newFolder', '새 폴더')}
-                            >
-                                <FolderPlus className="h-4 w-4" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleResetCounters}
-                                title={t('fragment.resetCounters', '순차 카운터 리셋')}
-                            >
-                                <RotateCcw className="h-4 w-4" />
-                            </Button>
+                            <Tip content={t('fragment.newFile', '새 파일')}>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleCreateFile()}
+                                >
+                                    <Plus className="h-4 w-4" />
+                                </Button>
+                            </Tip>
+                            <Tip content={t('fragment.newFolder', '새 폴더')}>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setIsCreatingFolder(true)}
+                                >
+                                    <FolderPlus className="h-4 w-4" />
+                                </Button>
+                            </Tip>
+                            <Tip content={t('fragment.resetCounters', '순차 카운터 리셋')}>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleResetCounters}
+                                >
+                                    <RotateCcw className="h-4 w-4" />
+                                </Button>
+                            </Tip>
                             <div className="flex-1" />
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" title={t('fragment.importExport', '불러오기/내보내기')}>
-                                        <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
+                                    <Tip content={t('fragment.importExport', '불러오기/내보내기')}>
+                                        <Button variant="ghost" size="sm">
+                                            <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                    </Tip>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                     <DropdownMenuItem onClick={handleImportTxt}>
@@ -582,14 +588,15 @@ export function FragmentPromptDialog({ open, onOpenChange }: FragmentPromptDialo
                                         className="h-8 w-40"
                                     />
                                     <div className="flex-1" />
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={handleExportTxt}
-                                        title={t('fragment.exportTxt', 'txt 파일로 내보내기')}
-                                    >
-                                        <Download className="h-4 w-4" />
-                                    </Button>
+                                    <Tip content={t('fragment.exportTxt', 'txt 파일로 내보내기')}>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={handleExportTxt}
+                                        >
+                                            <Download className="h-4 w-4" />
+                                        </Button>
+                                    </Tip>
                                     <Button
                                         size="sm"
                                         onClick={handleSave}

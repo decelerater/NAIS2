@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { ThreeColumnLayout } from '@/components/layout/ThreeColumnLayout'
 import { Toaster } from '@/components/ui/toaster'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { useSceneGeneration } from '@/hooks/useSceneGeneration'
 import { useUpdateChecker } from '@/hooks/useUpdateChecker'
 import { useShortcuts } from '@/hooks/useShortcuts'
@@ -54,10 +55,12 @@ function AppContent() {
 
 function App() {
     return (
-        <BrowserRouter>
-            <AppContent />
-            <Toaster />
-        </BrowserRouter>
+        <TooltipProvider delayDuration={300}>
+            <BrowserRouter>
+                <AppContent />
+                <Toaster />
+            </BrowserRouter>
+        </TooltipProvider>
     )
 }
 

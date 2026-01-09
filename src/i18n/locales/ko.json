@@ -104,13 +104,16 @@
         "presetDefault": "기본 프리셋",
         "deleteSelected": "선택 삭제",
         "moveToPreset": "프리셋으로 이동",
-        "exportSelectedZip": "선택 ZIP",
+        "exportSelectedZip": "선택한 씬 이미지 ZIP 내보내기",
         "importJson": "JSON 불러오기",
-        "exportJson": "JSON 내보내기",
-        "thumbnailLayout": "썸네일 배치",
+        "exportJson": "씬 데이터를 JSON으로 내보내기",
+        "thumbnailLayout": "세로/가로 썸네일 전환",
         "deleteNonFavorites": "즐겨찾기 제외 삭제",
         "deletedNonFavorites": "{{count}}개 이미지 삭제됨",
-        "noImages": "생성된 이미지가 없습니다"
+        "noImages": "생성된 이미지가 없습니다",
+        "applyResolution": "선택한 씬에 해상도 적용",
+        "gridColumnsDesc": "그리드 열 개수 변경",
+        "deletePreset": "프리셋 삭제"
     },
     "preset": {
         "default": "기본",
@@ -381,11 +384,16 @@
         "clear": "초기화",
         "addAsRef": "이미지 참조",
         "saveAs": "다른 이름으로 저장",
-        "openFolder": "폴더 열기",
+        "openFolder": "생성된 이미지 폴더 열기",
         "rename": "이름 변경",
         "copied": "복사 완료",
         "copyFailed": "복사 실패",
-        "deleted": "삭제 완료"
+        "deleted": "삭제 완료",
+        "back": "씼 목록으로 돌아가기"
+    },
+    "layout": {
+        "toggleLeftSidebar": "왼쪽 사이드바 토글",
+        "toggleRightSidebar": "오른쪽 사이드바 토글"
     },
     "resolutions": {
         "portrait": "세로",
@@ -395,10 +403,11 @@
         "wideLandscape": "넓은 가로",
         "custom": "커스텀",
         "addCustom": "커스텀 해상도 추가",
-        "addCustomDesc": "새로운 해상도 프리셋을 추가합니다",
+        "addCustomDesc": "새로운 해상도 프리셋을 추가합니다 (64의 배수로 자동 보정)",
         "presetName": "프리셋 이름",
         "width": "너비",
-        "height": "높이"
+        "height": "높이",
+        "finalResolution": "최종 해상도"
     },
     "library": {
         "title": "라이브러리",
@@ -423,9 +432,14 @@
         "renameDesc": "선택한 이미지의 새로운 이름을 입력하세요.",
         "dropHint": "이미지를 드래그하여 추가하세요",
         "createStack": "스택 만들기",
+        "createStackDesc": "선택한 이미지를 하나의 스택으로 묶음",
         "unstack": "스택 해제",
+        "unstackDesc": "선택한 스택을 개별 이미지로 분리",
         "stackCount": "{{count}}개",
-        "import": "이미지 불러오기"
+        "import": "이미지 불러오기",
+        "importDesc": "이미지 파일 불러오기",
+        "editModeDesc": "여러 이미지를 선택하여 일괄 편집",
+        "gridColumnsDesc": "그리드 열 개수 변경"
     },
     "settingsPage": {
         "title": "설정",
@@ -646,15 +660,18 @@
         "rename": "이름 변경",
         "duplicate": "복제",
         "namePlaceholder": "캐릭터 이름 입력...",
-        "positionTitle": "캐릭터 위치 지정",
+        "positionTitle": "이미지 내 캐릭터 위치 지정",
+        "positionDesc": "캐릭터 위치 기능 활성화",
         "positionHelp": "캐릭터를 드래그하여 위치를 지정하세요",
         "noActiveCharacters": "활성화된 캐릭터가 없습니다",
+        "addDesc": "새 캐릭터 프롬프트 추가",
+        "addFolderDesc": "캐릭터 폴더 생성",
         "search": "캐릭터 검색...",
         "noResults": "검색 결과가 없습니다",
         "newFolder": "새 폴더...",
         "emptyFolder": "빈 폴더",
         "ungrouped": "미분류",
-        "toggleAll": "전체 토글",
+        "toggleAll": "폴더 내 전체 활성화/비활성화",
         "saveAsPreset": "프리셋으로 저장",
         "savedAsPreset": "프리셋으로 저장됨",
         "moveToFolder": "폴더로 이동",

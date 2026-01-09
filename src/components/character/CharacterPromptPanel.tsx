@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/context-menu'
 import { useCharacterPromptStore, CHARACTER_COLORS, CharacterPrompt, FOLDER_COLORS } from '@/stores/character-prompt-store'
 import { useSettingsStore } from '@/stores/settings-store'
+import { Tip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { toast } from '@/components/ui/use-toast'
 import {
@@ -264,47 +265,51 @@ export function CharacterPromptPanel({ open, onOpenChange }: CharacterPromptPane
                     <div className="flex items-center gap-1">
                         {/* 위치 설정 다이얼로그 (활성화 시에만) - 왼쪽에 배치 */}
                         {positionEnabled && (
+                            <Tip content={t('characterPanel.positionTitle', '이미지 내 캐릭터 위치 지정')}>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => setPositionDialogOpen(true)}
+                                >
+                                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                                </Button>
+                            </Tip>
+                        )}
+                        {/* 위치 활성화 토글 */}
+                        <Tip content={t('characterPanel.positionDesc', '캐릭터 위치 기능 활성화')}>
+                            <Button
+                                variant={positionEnabled ? "default" : "ghost"}
+                                size="icon"
+                                className={cn(
+                                    "h-7 w-7",
+                                    positionEnabled && "bg-primary text-primary-foreground"
+                                )}
+                                onClick={() => setPositionEnabled(!positionEnabled)}
+                            >
+                                <MapPin className="h-3.5 w-3.5" />
+                            </Button>
+                        </Tip>
+                        <Tip content={t('characterPanel.addDesc', '새 캐릭터 프롬프트 추가')}>
                             <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7"
-                                onClick={() => setPositionDialogOpen(true)}
-                                title={t('characterPanel.positionTitle', '캐릭터 위치 지정')}
+                                onClick={handleAddCharacter}
                             >
-                                <SlidersHorizontal className="h-3.5 w-3.5" />
+                                <Plus className="h-3.5 w-3.5" />
                             </Button>
-                        )}
-                        {/* 위치 활성화 토글 */}
-                        <Button
-                            variant={positionEnabled ? "default" : "ghost"}
-                            size="icon"
-                            className={cn(
-                                "h-7 w-7",
-                                positionEnabled && "bg-primary text-primary-foreground"
-                            )}
-                            onClick={() => setPositionEnabled(!positionEnabled)}
-                            title={t('characterPanel.position', '위치')}
-                        >
-                            <MapPin className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={handleAddCharacter}
-                            title={t('characterPanel.add', '추가')}
-                        >
-                            <Plus className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={handleCreateGroup}
-                            title={t('characterPanel.addFolder', '폴더 추가')}
-                        >
-                            <FolderPlus className="h-3.5 w-3.5" />
-                        </Button>
+                        </Tip>
+                        <Tip content={t('characterPanel.addFolderDesc', '캐릭터 폴더 생성')}>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={handleCreateGroup}
+                            >
+                                <FolderPlus className="h-3.5 w-3.5" />
+                            </Button>
+                        </Tip>
                         <Button
                             variant="ghost"
                             size="icon"
@@ -409,15 +414,16 @@ export function CharacterPromptPanel({ open, onOpenChange }: CharacterPromptPane
                                                         </span>
                                                     </button>
                                                     <div className="opacity-0 group-hover/folder:opacity-100 transition-opacity flex gap-1">
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            className="h-7 w-7"
-                                                            onClick={() => toggleGroupEnabled(group.id)}
-                                                            title={t('characterPanel.toggleAll', '전체 토글')}
-                                                        >
-                                                            <Eye className="w-4 h-4" />
-                                                        </Button>
+                                                        <Tip content={t('characterPanel.toggleAll', '폴더 내 전체 활성화/비활성화')}>
+                                                            <Button
+                                                                size="icon"
+                                                                variant="ghost"
+                                                                className="h-7 w-7"
+                                                                onClick={() => toggleGroupEnabled(group.id)}
+                                                            >
+                                                                <Eye className="w-4 h-4" />
+                                                            </Button>
+                                                        </Tip>
                                                         <Button
                                                             size="icon"
                                                             variant="ghost"

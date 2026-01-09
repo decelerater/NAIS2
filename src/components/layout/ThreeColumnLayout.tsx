@@ -10,6 +10,7 @@ import { PresetDropdown } from '@/components/preset/PresetDropdown'
 import { useAuthStore } from '@/stores/auth-store'
 import { SHORTCUT_EVENTS } from '@/hooks/useShortcuts'
 import GlassSurface from '@/components/ui/GlassSurface'
+import { Tip } from '@/components/ui/tooltip'
 import {
     Home,
     Film,
@@ -158,17 +159,18 @@ export function ThreeColumnLayout({ children }: ThreeColumnLayoutProps) {
                     <div className="shrink-0 flex items-center justify-center py-3 z-10 gap-2">
                         {/* Mac: Left sidebar toggle */}
                         {isMac && (
-                            <button
-                                onClick={toggleLeftSidebar}
-                                className={cn(
-                                    "p-1.5 rounded-full transition-colors",
-                                    "text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                                    !leftSidebarVisible && "opacity-50"
-                                )}
-                                title="Toggle Left Sidebar"
-                            >
-                                <PanelLeft className="h-4 w-4" />
-                            </button>
+                            <Tip content={t('layout.toggleLeftSidebar', 'Toggle Left Sidebar')}>
+                                <button
+                                    onClick={toggleLeftSidebar}
+                                    className={cn(
+                                        "p-1.5 rounded-full transition-colors",
+                                        "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                                        !leftSidebarVisible && "opacity-50"
+                                    )}
+                                >
+                                    <PanelLeft className="h-4 w-4" />
+                                </button>
+                            </Tip>
                         )}
                         <GlassSurface
                             width="fit-content"
@@ -183,17 +185,18 @@ export function ThreeColumnLayout({ children }: ThreeColumnLayoutProps) {
                         </GlassSurface>
                         {/* Mac: Right sidebar toggle */}
                         {isMac && (
-                            <button
-                                onClick={toggleRightSidebar}
-                                className={cn(
-                                    "p-1.5 rounded-full transition-colors",
-                                    "text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                                    !rightSidebarVisible && "opacity-50"
-                                )}
-                                title="Toggle Right Sidebar"
-                            >
-                                <PanelRight className="h-4 w-4" />
-                            </button>
+                            <Tip content={t('layout.toggleRightSidebar', 'Toggle Right Sidebar')}>
+                                <button
+                                    onClick={toggleRightSidebar}
+                                    className={cn(
+                                        "p-1.5 rounded-full transition-colors",
+                                        "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                                        !rightSidebarVisible && "opacity-50"
+                                    )}
+                                >
+                                    <PanelRight className="h-4 w-4" />
+                                </button>
+                            </Tip>
                         )}
                     </div>
 

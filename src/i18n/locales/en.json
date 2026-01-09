@@ -104,13 +104,16 @@
         "presetDefault": "Default Preset",
         "deleteSelected": "Delete Selected",
         "moveToPreset": "Move to Preset",
-        "exportSelectedZip": "Export Selected ZIP",
+        "exportSelectedZip": "Export selected scene images as ZIP",
         "importJson": "Import JSON",
-        "exportJson": "Export JSON",
-        "thumbnailLayout": "Thumbnail Layout",
+        "exportJson": "Export scene data as JSON",
+        "thumbnailLayout": "Toggle vertical/horizontal thumbnails",
         "deleteNonFavorites": "Delete Non-Favorites",
         "deletedNonFavorites": "{{count}} images deleted",
-        "noImages": "No generated images"
+        "noImages": "No generated images",
+        "applyResolution": "Apply resolution to selected scenes",
+        "gridColumnsDesc": "Change grid column count",
+        "deletePreset": "Delete Preset"
     },
     "preset": {
         "default": "Default",
@@ -353,11 +356,16 @@
         "clear": "Clear",
         "addAsRef": "Image Reference",
         "saveAs": "Save As",
-        "openFolder": "Open Folder",
+        "openFolder": "Open generated images folder",
         "rename": "Rename",
         "copied": "Copied to clipboard",
         "copyFailed": "Copy failed",
-        "deleted": "Deleted successfully"
+        "deleted": "Deleted successfully",
+        "back": "Back to scene list"
+    },
+    "layout": {
+        "toggleLeftSidebar": "Toggle Left Sidebar",
+        "toggleRightSidebar": "Toggle Right Sidebar"
     },
     "resolutions": {
         "portrait": "Portrait",
@@ -367,10 +375,11 @@
         "wideLandscape": "Wide Landscape",
         "custom": "Custom",
         "addCustom": "Add Custom Resolution",
-        "addCustomDesc": "Add a new resolution preset",
+        "addCustomDesc": "Add a new resolution preset (auto-adjusted to multiples of 64)",
         "presetName": "Preset Name",
         "width": "Width",
-        "height": "Height"
+        "height": "Height",
+        "finalResolution": "Final Resolution"
     },
     "library": {
         "title": "Library",
@@ -395,9 +404,14 @@
         "renameDesc": "Enter a new name for the select image.",
         "dropHint": "Drag and drop images to add",
         "createStack": "Create Stack",
+        "createStackDesc": "Group selected images into a stack",
         "unstack": "Unstack",
+        "unstackDesc": "Separate stack into individual images",
         "stackCount": "{{count}}",
-        "import": "Import Images"
+        "import": "Import Images",
+        "importDesc": "Import image files",
+        "editModeDesc": "Select multiple images for batch editing",
+        "gridColumnsDesc": "Change grid column count"
     },
     "settingsPage": {
         "title": "Settings",
@@ -645,15 +659,18 @@
         "rename": "Rename",
         "duplicate": "Duplicate",
         "namePlaceholder": "Enter character name...",
-        "positionTitle": "Character Position",
+        "positionTitle": "Set character position in image",
+        "positionDesc": "Enable character position feature",
         "positionHelp": "Drag characters to set their position",
         "noActiveCharacters": "No active characters",
+        "addDesc": "Add new character prompt",
+        "addFolderDesc": "Create character folder",
         "search": "Search characters...",
         "noResults": "No results found",
         "newFolder": "New folder...",
         "emptyFolder": "Empty folder",
         "ungrouped": "Ungrouped",
-        "toggleAll": "Toggle all",
+        "toggleAll": "Enable/disable all in folder",
         "saveAsPreset": "Save as Preset",
         "savedAsPreset": "Saved as Preset",
         "moveToFolder": "Move to Folder",

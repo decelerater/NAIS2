@@ -70,6 +70,7 @@ import {
     LayoutList,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Tip } from '@/components/ui/tooltip'
 import { useSceneStore } from '@/stores/scene-store'
 import { useGenerationStore } from '@/stores/generation-store'
 import { toast } from '@/components/ui/use-toast'
@@ -373,9 +374,11 @@ export default function SceneMode() {
                 /* Edit Mode Toolbar */
                 <div className="flex items-center justify-between bg-primary/10 border border-primary/30 rounded-2xl p-3">
                     <div className="flex items-center gap-3">
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-primary hover:bg-primary/20" onClick={() => { setEditMode(false); clearSelection() }} title={t('scene.exitEditMode', '편집 종료')}>
-                            <X className="h-4 w-4" />
-                        </Button>
+                        <Tip content={t('scene.exitEditMode', '편집 종료')} shortcut="Esc">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 text-primary hover:bg-primary/20" onClick={() => { setEditMode(false); clearSelection() }}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </Tip>
                         <div className="h-6 w-px bg-primary/20" />
                         <span className="text-sm font-medium text-primary">
                             {t('scene.selectedCount', { count: selectedSceneIds.length })}
@@ -383,13 +386,17 @@ export default function SceneMode() {
                     </div>
                     <div className="flex items-center gap-2">
                         {/* Select All */}
-                        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={selectAllScenes} disabled={scenes.length === 0} title={t('scene.selectAll', '전체 선택')}>
-                            <CheckSquare className="h-4 w-4" />
-                        </Button>
+                        <Tip content={t('scene.selectAll', '전체 선택')} shortcut="Ctrl+A">
+                            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={selectAllScenes} disabled={scenes.length === 0}>
+                                <CheckSquare className="h-4 w-4" />
+                            </Button>
+                        </Tip>
                         {/* Deselect All */}
-                        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={clearSelection} disabled={selectedSceneIds.length === 0} title={t('scene.deselectAll', '선택 해제')}>
-                            <Square className="h-4 w-4" />
-                        </Button>
+                        <Tip content={t('scene.deselectAll', '선택 해제')}>
+                            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={clearSelection} disabled={selectedSceneIds.length === 0}>
+                                <Square className="h-4 w-4" />
+                            </Button>
+                        </Tip>
                         <div className="h-6 w-px bg-border" />
 
                         {/* Change Resolution */}
@@ -401,9 +408,11 @@ export default function SceneMode() {
                                     disabled={selectedSceneIds.length === 0}
                                 />
                             </div>
-                            <Button variant="secondary" size="icon" className="h-9 w-9" onClick={handleApplyResolutionToSelected} disabled={selectedSceneIds.length === 0} title={t('common.change', '변경')}>
-                                <Check className="h-4 w-4" />
-                            </Button>
+                            <Tip content={t('scene.applyResolution', '선택한 씬에 해상도 적용')}>
+                                <Button variant="secondary" size="icon" className="h-9 w-9" onClick={handleApplyResolutionToSelected} disabled={selectedSceneIds.length === 0}>
+                                    <Check className="h-4 w-4" />
+                                </Button>
+                            </Tip>
                         </div>
 
                         <div className="h-6 w-px bg-border" />
@@ -411,9 +420,11 @@ export default function SceneMode() {
                         {/* Move to Preset */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="icon" className="h-9 w-9" disabled={selectedSceneIds.length === 0 || presets.length < 2} title={t('scene.moveToPreset', '프리셋으로 이동')}>
-                                    <FolderInput className="h-4 w-4" />
-                                </Button>
+                                <Tip content={t('scene.moveToPreset', '프리셋으로 이동')}>
+                                    <Button variant="outline" size="icon" className="h-9 w-9" disabled={selectedSceneIds.length === 0 || presets.length < 2}>
+                                        <FolderInput className="h-4 w-4" />
+                                    </Button>
+                                </Tip>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
                                 {presets.filter(p => p.id !== activePresetId).map(p => (
@@ -426,14 +437,18 @@ export default function SceneMode() {
                         </DropdownMenu>
 
                         {/* Delete Selected */}
-                        <Button variant="destructive" size="icon" className="h-9 w-9" onClick={deleteSelectedScenes} disabled={selectedSceneIds.length === 0} title={t('scene.deleteSelected', '선택 삭제')}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <Tip content={t('scene.deleteSelected', '선택 삭제')} shortcut="Del">
+                            <Button variant="destructive" size="icon" className="h-9 w-9" onClick={deleteSelectedScenes} disabled={selectedSceneIds.length === 0}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </Tip>
 
                         {/* Export Selected ZIP */}
-                        <Button variant="outline" size="icon" className="h-9 w-9" onClick={handleExportSelectedZip} disabled={selectedSceneIds.length === 0} title={t('scene.exportSelectedZip', '선택 ZIP')}>
-                            <Download className="h-4 w-4" />
-                        </Button>
+                        <Tip content={t('scene.exportSelectedZip', '선택한 씬 이미지 ZIP 내보내기')}>
+                            <Button variant="outline" size="icon" className="h-9 w-9" onClick={handleExportSelectedZip} disabled={selectedSceneIds.length === 0}>
+                                <Download className="h-4 w-4" />
+                            </Button>
+                        </Tip>
                     </div>
                 </div>
             ) : (
@@ -453,28 +468,40 @@ export default function SceneMode() {
                             onChange={handleFileInputChange}
                         />
                         {/* Import JSON Button */}
-                        <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 border-white/10 hover:bg-white/5" onClick={handleImportClick} disabled={isGenerating} title={t('scene.importJson', 'JSON 불러오기')}>
-                            <Upload className="h-4 w-4" />
-                        </Button>
+                        <Tip content={t('scene.importJson', 'JSON 불러오기')}>
+                            <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 border-white/10 hover:bg-white/5" onClick={handleImportClick} disabled={isGenerating}>
+                                <Upload className="h-4 w-4" />
+                            </Button>
+                        </Tip>
                         {/* Edit Mode Toggle Button */}
-                        <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 border-white/10 hover:bg-white/5" onClick={() => setEditMode(true)} disabled={scenes.length === 0 || isGenerating} title={t('scene.editMode', '편집 모드')}>
-                            <Edit3 className="h-4 w-4" />
-                        </Button>
+                        <Tip content={t('scene.editMode', '여러 씬을 선택하여 일괄 편집')}>
+                            <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 border-white/10 hover:bg-white/5" onClick={() => setEditMode(true)} disabled={scenes.length === 0 || isGenerating}>
+                                <Edit3 className="h-4 w-4" />
+                            </Button>
+                        </Tip>
                         <div className="flex items-center bg-muted/30 rounded-xl p-1 border border-white/5">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10" onClick={() => activePresetId && addAllToQueue(activePresetId, batchCount)} disabled={scenes.length === 0 || isGenerating} title={t('scene.addAllQueue')}>
-                                <ListPlus className="h-4 w-4" />
-                            </Button>
+                            <Tip content={t('scene.addAllQueue', '모든 씬 생성 대기열에 추가')}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-white/10" onClick={() => activePresetId && addAllToQueue(activePresetId, batchCount)} disabled={scenes.length === 0 || isGenerating}>
+                                    <ListPlus className="h-4 w-4" />
+                                </Button>
+                            </Tip>
                             <div className="w-px h-4 bg-white/10 mx-1" />
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => activePresetId && clearAllQueue(activePresetId)} disabled={totalQueue === 0 || isGenerating} title={t('scene.clearAllQueue')}>
-                                <ListX className="h-4 w-4" />
-                            </Button>
+                            <Tip content={t('scene.clearAllQueue', '모든 대기열 초기화')}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => activePresetId && clearAllQueue(activePresetId)} disabled={totalQueue === 0 || isGenerating}>
+                                    <ListX className="h-4 w-4" />
+                                </Button>
+                            </Tip>
                         </div>
-                        <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 border-white/10 hover:bg-white/5" onClick={handleExportJson} disabled={!activePreset || isGenerating} title={t('scene.exportJson', 'JSON 내보내기')}>
-                            <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 border-white/10 hover:bg-white/5" onClick={handleExportZip} disabled={scenes.length === 0} title={t('scene.exportZip')}>
-                            <Download className="h-4 w-4" />
-                        </Button>
+                        <Tip content={t('scene.exportJson', '씬 데이터를 JSON으로 내보내기')}>
+                            <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 border-white/10 hover:bg-white/5" onClick={handleExportJson} disabled={!activePreset || isGenerating}>
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                        </Tip>
+                        <Tip content={t('scene.exportZip', '모든 씬 이미지 ZIP 내보내기')}>
+                            <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 border-white/10 hover:bg-white/5" onClick={handleExportZip} disabled={scenes.length === 0}>
+                                <Download className="h-4 w-4" />
+                            </Button>
+                        </Tip>
                     </div>
                 </div>
             )}
@@ -563,13 +590,17 @@ export default function SceneMode() {
                     {activePreset && activePreset.id !== 'scene-default' && (
                         <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10">
                             {!isRenamingPreset && (
-                                <Button variant="ghost" size="icon" className="shrink-0 rounded-lg h-8 w-8 hover:bg-white/10" onClick={() => setIsRenamingPreset(true)} title={t('actions.rename')} disabled={isGenerating}>
-                                    <Pencil className="h-4 w-4" />
-                                </Button>
+                                <Tip content={t('actions.rename', '이름 변경')}>
+                                    <Button variant="ghost" size="icon" className="shrink-0 rounded-lg h-8 w-8 hover:bg-white/10" onClick={() => setIsRenamingPreset(true)} disabled={isGenerating}>
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
+                                </Tip>
                             )}
-                            <Button variant="ghost" size="icon" className="shrink-0 rounded-lg h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => deletePreset(activePreset.id)} disabled={isGenerating}>
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <Tip content={t('scene.deletePreset', '프리셋 삭제')}>
+                                <Button variant="ghost" size="icon" className="shrink-0 rounded-lg h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => deletePreset(activePreset.id)} disabled={isGenerating}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </Tip>
                         </div>
                     )}
                 </div>
@@ -577,19 +608,22 @@ export default function SceneMode() {
 
 
                 <div className="flex items-center gap-2 ml-auto">
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-white/10" 
-                        onClick={() => setThumbnailLayout(thumbnailLayout === 'vertical' ? 'horizontal' : 'vertical')} 
-                        title={t('scene.thumbnailLayout', '썸네일 배치')}
-                    >
-                        {thumbnailLayout === 'vertical' ? <LayoutGrid className="h-4 w-4" /> : <LayoutList className="h-4 w-4" />}
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-9 text-muted-foreground hover:text-foreground hover:bg-white/10" onClick={handleToggleGrid} title={t('scene.gridColumns', { count: gridColumns })}>
-                        <Grid3x3 className="h-4 w-4 mr-1.5" />
-                        <span className="font-medium text-sm">{gridColumns}</span>
-                    </Button>
+                    <Tip content={t('scene.thumbnailLayout', '세로/가로 썸네일 전환')}>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-white/10" 
+                            onClick={() => setThumbnailLayout(thumbnailLayout === 'vertical' ? 'horizontal' : 'vertical')}
+                        >
+                            {thumbnailLayout === 'vertical' ? <LayoutGrid className="h-4 w-4" /> : <LayoutList className="h-4 w-4" />}
+                        </Button>
+                    </Tip>
+                    <Tip content={t('scene.gridColumnsDesc', '그리드 열 개수 변경')}>
+                        <Button variant="ghost" size="sm" className="h-9 text-muted-foreground hover:text-foreground hover:bg-white/10" onClick={handleToggleGrid}>
+                            <Grid3x3 className="h-4 w-4 mr-1.5" />
+                            <span className="font-medium text-sm">{gridColumns}</span>
+                        </Button>
+                    </Tip>
                 </div>
             </div>
 

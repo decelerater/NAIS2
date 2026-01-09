@@ -9,6 +9,7 @@ import {
     DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Tip } from '@/components/ui/tooltip'
 import { useCharacterStore } from '@/stores/character-store'
 import { toast } from '@/components/ui/use-toast'
 
@@ -99,25 +100,26 @@ export function ImageReferenceDialog({ open, onOpenChange, imageBase64 }: ImageR
                         </Button>
 
                         {/* Vibe Transfer Button - Bottom */}
-                        <Button
-                            variant="outline"
-                            className="flex-1 flex items-center justify-start gap-3 hover:bg-primary/10 hover:border-primary"
-                            onClick={handleAddAsVibe}
-                            disabled={isProcessing || characterImages.length > 0}
-                            title={characterImages.length > 0 ? t('characterDialog.vibeDisabledMsg') : undefined}
-                        >
-                            <Sparkles className="h-6 w-6 text-purple-500 flex-shrink-0" />
-                            <div className="text-left">
-                                <div className="font-medium">
-                                    {t('imageRef.vibeTransfer', 'Vibe Transfer')}
+                        <Tip content={characterImages.length > 0 ? t('characterDialog.vibeDisabledMsg') : undefined}>
+                            <Button
+                                variant="outline"
+                                className="flex-1 flex items-center justify-start gap-3 hover:bg-primary/10 hover:border-primary"
+                                onClick={handleAddAsVibe}
+                                disabled={isProcessing || characterImages.length > 0}
+                            >
+                                <Sparkles className="h-6 w-6 text-purple-500 flex-shrink-0" />
+                                <div className="text-left">
+                                    <div className="font-medium">
+                                        {t('imageRef.vibeTransfer', 'Vibe Transfer')}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {characterImages.length > 0
+                                            ? <span className="text-destructive font-medium">{t('characterDialog.vibeDisabledMsg')}</span>
+                                            : t('imageRef.vibeDesc', '이미지 스타일/분위기 참조')}
+                                    </div>
                                 </div>
-                                <div className="text-xs text-muted-foreground">
-                                    {characterImages.length > 0
-                                        ? <span className="text-destructive font-medium">{t('characterDialog.vibeDisabledMsg')}</span>
-                                        : t('imageRef.vibeDesc', '이미지 스타일/분위기 참조')}
-                                </div>
-                            </div>
-                        </Button>
+                            </Button>
+                        </Tip>
                     </div>
                 </div>
             </DialogContent>

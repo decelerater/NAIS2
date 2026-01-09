@@ -10,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
+import { Tip } from '@/components/ui/tooltip'
 import {
     Key,
     Settings2,
@@ -987,9 +988,11 @@ function ShortcutRow({ action, binding, allBindings, isEditing, recordedBinding,
                             >
                                 {displayBinding.label}
                             </button>
-                            <Button size="sm" variant="ghost" onClick={onReset} title={t('settingsPage.shortcuts.reset', '초기화')}>
-                                <RotateCcw className="h-3 w-3" />
-                            </Button>
+                            <Tip content={t('settingsPage.shortcuts.reset', '초기화')}>
+                                <Button size="sm" variant="ghost" onClick={onReset}>
+                                    <RotateCcw className="h-3 w-3" />
+                                </Button>
+                            </Tip>
                         </>
                     )}
                 </div>

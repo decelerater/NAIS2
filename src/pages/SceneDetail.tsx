@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { AutocompleteTextarea } from "@/components/ui/AutocompleteTextarea";
+import { Tip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useSceneStore, SceneImage } from '@/stores/scene-store'
 import { useSettingsStore } from '@/stores/settings-store'
@@ -285,12 +286,16 @@ export default function SceneDetail() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="icon" className="rounded-xl" onClick={handleOpenFolder} title={t('actions.openFolder', '폴더 열기')}>
-                        <FolderOpen className="h-5 w-5 text-muted-foreground" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="rounded-xl" onClick={handleBack}>
-                        <ChevronLeft className="h-5 w-5" />
-                    </Button>
+                    <Tip content={t('actions.openFolder', '생성된 이미지 폴더 열기')}>
+                        <Button variant="ghost" size="icon" className="rounded-xl" onClick={handleOpenFolder}>
+                            <FolderOpen className="h-5 w-5 text-muted-foreground" />
+                        </Button>
+                    </Tip>
+                    <Tip content={t('actions.back', '씬 목록으로 돌아가기')}>
+                        <Button variant="ghost" size="icon" className="rounded-xl" onClick={handleBack}>
+                            <ChevronLeft className="h-5 w-5" />
+                        </Button>
+                    </Tip>
                     <div>
                         {isEditingName ? (
                             <div className="flex items-center gap-2">
@@ -405,7 +410,6 @@ export default function SceneDetail() {
                                 }
                             }}
                             disabled={scene.images.filter(img => !img.isFavorite).length === 0}
-                            title={t('scene.deleteNonFavorites', '즐겨찾기 제외 삭제')}
                         >
                             <Trash2 className="h-3 w-3" />
                             {t('scene.deleteNonFavorites', '즐겨찾기 제외 삭제')}

@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Tip } from '@/components/ui/tooltip'
 import { Plus, ChevronDown, Check, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
@@ -27,6 +28,9 @@ export const RESOLUTION_PRESETS = [
     { key: 'tallPortrait', width: 640, height: 1536 },
     { key: 'wideLandscape', width: 1536, height: 640 },
 ]
+
+// NovelAI requires dimensions to be multiples of 64
+export const roundTo64 = (value: number): number => Math.round(value / 64) * 64
 
 export interface Resolution {
     label: string
@@ -93,13 +97,19 @@ export function ResolutionSelector({ value, onChange, disabled }: ResolutionSele
     }
 
     const handleCustomSave = () => {
-        const label = customLabel || `${customWidth}x${customHeight}`
-        const width = Number(customWidth)
-        const height = Number(customHeight)
+        // Round to nearest multiple of 64 (NovelAI requirement)
+        const width = roundTo64(Number(customWidth))
+        const height = roundTo64(Number(customHeight))
+        const label = customLabel || `${width}x${height}`
 
         addCustomResolution({ label, width, height })
         onChange({ label, width, height })
         setCustomDialogOpen(false)
+        
+        // Reset for next time
+        setCustomWidth(1024)
+        setCustomHeight(1024)
+        setCustomLabel('Custom')
     }
 
     const isSelected = (w: number, h: number) => value.width === w && value.height === h
@@ -176,24 +186,25 @@ export function ResolutionSelector({ value, onChange, disabled }: ResolutionSele
                                                 <span className="text-xs text-muted-foreground">
                                                     {c.width} × {c.height}
                                                 </span>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        removeCustomResolution(c.id)
-                                                        // If current selection was deleted, reset to portrait
-                                                        if (isSelected(c.width, c.height)) {
-                                                            onChange({
-                                                                label: t('resolutions.portrait'),
-                                                                width: 832,
-                                                                height: 1216,
-                                                            })
-                                                        }
-                                                    }}
-                                                    className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity p-0.5 cursor-pointer"
-                                                    title={t('common.delete')}
-                                                >
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </button>
+                                                <Tip content={t('common.delete')}>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            removeCustomResolution(c.id)
+                                                            // If current selection was deleted, reset to portrait
+                                                            if (isSelected(c.width, c.height)) {
+                                                                onChange({
+                                                                    label: t('resolutions.portrait'),
+                                                                    width: 832,
+                                                                    height: 1216,
+                                                                })
+                                                            }
+                                                        }}
+                                                        className="opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity p-0.5 cursor-pointer"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </Tip>
                                             </span>
                                         </div>
                                     ))}
@@ -240,25 +251,45 @@ export function ResolutionSelector({ value, onChange, disabled }: ResolutionSele
                             <Label htmlFor="width" className="text-right">
                                 {t('resolutions.width')}
                             </Label>
-                            <Input
-                                id="width"
-                                type="number"
-                                value={customWidth}
-                                onChange={(e) => setCustomWidth(Number(e.target.value))}
-                                className="col-span-3"
-                            />
+                            <div className="col-span-3 flex items-center gap-2">
+                                <Input
+                                    id="width"
+                                    type="number"
+                                    step={64}
+                                    value={customWidth}
+                                    onChange={(e) => setCustomWidth(Number(e.target.value))}
+                                    className="flex-1"
+                                />
+                                {roundTo64(customWidth) !== customWidth && (
+                                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                        → {roundTo64(customWidth)}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="height" className="text-right">
                                 {t('resolutions.height')}
                             </Label>
-                            <Input
-                                id="height"
-                                type="number"
-                                value={customHeight}
-                                onChange={(e) => setCustomHeight(Number(e.target.value))}
-                                className="col-span-3"
-                            />
+                            <div className="col-span-3 flex items-center gap-2">
+                                <Input
+                                    id="height"
+                                    type="number"
+                                    step={64}
+                                    value={customHeight}
+                                    onChange={(e) => setCustomHeight(Number(e.target.value))}
+                                    className="flex-1"
+                                />
+                                {roundTo64(customHeight) !== customHeight && (
+                                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                        → {roundTo64(customHeight)}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        {/* Preview of final resolution */}
+                        <div className="text-center text-sm text-muted-foreground pt-2 border-t">
+                            {t('resolutions.finalResolution', '최종 해상도')}: <span className="font-mono font-medium text-foreground">{roundTo64(customWidth)} × {roundTo64(customHeight)}</span>
                         </div>
                     </div>
                     <DialogFooter>

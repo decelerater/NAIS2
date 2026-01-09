@@ -28,6 +28,7 @@ import { pictureDir, join } from '@tauri-apps/api/path'
 import { toast } from '@/components/ui/use-toast'
 import { ImagePlus, X, Grid3x3, Edit3, Trash2, Layers, ArrowLeft, CheckSquare, FolderOpen, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Tip } from '@/components/ui/tooltip'
 import { useSettingsStore } from '@/stores/settings-store'
 
 const dropAnimation = {
@@ -457,16 +458,17 @@ export default function Library() {
                             </Button>
                             <div className="w-px h-5 bg-white/10" />
                             {!currentStackId && (
-                                <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="h-9 hover:bg-white/10" 
-                                    onClick={createStackFromSelected}
-                                    disabled={selectedItemIds.length < 2}
-                                    title={t('library.createStack', '스택 만들기')}
-                                >
-                                    <Layers className="h-4 w-4 mr-2" /> {t('library.createStack', '스택 만들기')}
-                                </Button>
+                                <Tip content={t('library.createStackDesc', '선택한 이미지를 하나의 스택으로 묶음')}>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-9 hover:bg-white/10" 
+                                        onClick={createStackFromSelected}
+                                        disabled={selectedItemIds.length < 2}
+                                    >
+                                        <Layers className="h-4 w-4 mr-2" /> {t('library.createStack', '스택 만들기')}
+                                    </Button>
+                                </Tip>
                             )}
                             <Button 
                                 variant="ghost" 
@@ -505,40 +507,45 @@ export default function Library() {
                                 onChange={handleFileInputChange}
                             />
                             {/* Import Image Button */}
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-white/10" 
-                                onClick={handleImportClick}
-                                title={t('library.import', '이미지 불러오기')}
-                            >
-                                <Upload className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-white/10" 
-                                onClick={() => setEditMode(true)} 
-                                disabled={viewItems.length === 0}
-                                title={t('scene.editMode', '편집 모드')}
-                            >
-                                <Edit3 className="h-4 w-4" />
-                            </Button>
-                            {currentStackId && (
+                            <Tip content={t('library.import', '이미지 불러오기')}>
                                 <Button 
                                     variant="ghost" 
-                                    size="sm" 
-                                    className="h-9 hover:bg-white/10" 
-                                    onClick={() => unstack(currentStackId)}
-                                    title={t('library.unstack', '스택 해제')}
+                                    size="icon" 
+                                    className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-white/10" 
+                                    onClick={handleImportClick}
                                 >
-                                    <FolderOpen className="h-4 w-4 mr-2" /> {t('library.unstack', '스택 해제')}
+                                    <Upload className="h-4 w-4" />
                                 </Button>
+                            </Tip>
+                            <Tip content={t('library.editModeDesc', '여러 이미지를 선택하여 일괄 편집')}>
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-white/10" 
+                                    onClick={() => setEditMode(true)} 
+                                    disabled={viewItems.length === 0}
+                                >
+                                    <Edit3 className="h-4 w-4" />
+                                </Button>
+                            </Tip>
+                            {currentStackId && (
+                                <Tip content={t('library.unstackDesc', '스택을 해제하고 개별 이미지로 복원')}>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-9 hover:bg-white/10" 
+                                        onClick={() => unstack(currentStackId)}
+                                    >
+                                        <FolderOpen className="h-4 w-4 mr-2" /> {t('library.unstack', '스택 해제')}
+                                    </Button>
+                                </Tip>
                             )}
-                            <Button variant="ghost" size="sm" className="h-9 text-muted-foreground hover:text-foreground hover:bg-white/10" onClick={handleToggleGrid} title={t('scene.gridColumns', { count: gridColumns })}>
-                                <Grid3x3 className="h-4 w-4 mr-1.5" />
-                                <span className="font-medium text-sm">{gridColumns}</span>
-                            </Button>
+                            <Tip content={t('library.gridColumnsDesc', '그리드 열 개수 변경')}>
+                                <Button variant="ghost" size="sm" className="h-9 text-muted-foreground hover:text-foreground hover:bg-white/10" onClick={handleToggleGrid}>
+                                    <Grid3x3 className="h-4 w-4 mr-1.5" />
+                                    <span className="font-medium text-sm">{gridColumns}</span>
+                                </Button>
+                            </Tip>
                             <span className="text-sm text-muted-foreground">{viewItems.length} {t('library.items', 'items')}</span>
                         </div>
                     </>
