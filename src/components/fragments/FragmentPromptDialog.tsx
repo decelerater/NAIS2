@@ -466,11 +466,9 @@ export function FragmentPromptDialog({ open, onOpenChange }: FragmentPromptDialo
                             <div className="flex-1" />
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Tip content={t('fragment.importExport', '불러오기/내보내기')}>
-                                        <Button variant="ghost" size="sm">
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </Tip>
+                                    <Button variant="ghost" size="sm" title={t('fragment.importExport', '불러오기/내보내기')}>
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                     <DropdownMenuItem onClick={handleImportTxt}>
