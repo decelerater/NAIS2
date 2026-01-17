@@ -340,7 +340,19 @@ export const useGenerationStore = create<GenerationState>()(
                         set({ currentBatch: i + 1 })
 
                         const startTime = Date.now()
-                        let finalPrompt = [basePrompt, inpaintingPrompt, additionalPrompt, detailPrompt].filter(Boolean).join(', ')
+                        
+                        // Helper to remove comment lines (lines starting with #)
+                        const removeComments = (text: string) => text
+                            .split('\n')
+                            .filter(line => !line.trimStart().startsWith('#'))
+                            .join('\n')
+                        
+                        let finalPrompt = [
+                            removeComments(basePrompt),
+                            removeComments(inpaintingPrompt),
+                            removeComments(additionalPrompt),
+                            removeComments(detailPrompt)
+                        ].filter(Boolean).join(', ')
 
                         // Fragment Substitution - use processWildcards which handles <filename> syntax
                         // Wildcard Processing (handles both <filename> fragments and (a/b/c) random selection) - async
@@ -402,7 +414,7 @@ export const useGenerationStore = create<GenerationState>()(
 
                         const generationParams = {
                             prompt: finalPrompt,
-                            negative_prompt: negativePrompt,
+                            negative_prompt: removeComments(negativePrompt),
                             model,
                             width: finalWidth,
                             height: finalHeight,

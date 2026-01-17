@@ -98,14 +98,20 @@ export function useSceneGeneration() {
                 // Get fresh generation store state
                 const genState = useGenerationStore.getState()
 
+                // Helper to remove comment lines (lines starting with #)
+                const removeComments = (text: string) => text
+                    .split('\n')
+                    .filter(line => !line.trimStart().startsWith('#'))
+                    .join('\n')
+
                 // Construct Prompt (including inpaintingPrompt if in inpaint mode)
                 const parts = [
-                    genState.basePrompt,
+                    removeComments(genState.basePrompt),
                     // Add inpainting prompt after basePrompt (same as main mode)
-                    genState.i2iMode === 'inpaint' ? genState.inpaintingPrompt : null,
-                    genState.additionalPrompt,
-                    scene.scenePrompt,
-                    genState.detailPrompt,
+                    genState.i2iMode === 'inpaint' ? removeComments(genState.inpaintingPrompt) : null,
+                    removeComments(genState.additionalPrompt),
+                    removeComments(scene.scenePrompt),
+                    removeComments(genState.detailPrompt),
                 ].filter(p => p && p.trim())
 
                 // Apply wildcard/fragment processing to final prompt (async)
@@ -156,7 +162,7 @@ export function useSceneGeneration() {
 
                 const params: GenerationParams = {
                     prompt: finalPrompt,
-                    negative_prompt: genState.negativePrompt,
+                    negative_prompt: removeComments(genState.negativePrompt),
                     steps: genState.steps,
                     cfg_scale: genState.cfgScale,
                     cfg_rescale: genState.cfgRescale,
