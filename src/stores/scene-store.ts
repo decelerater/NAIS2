@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { indexedDBStorage } from '@/lib/indexed-db'
+import { rename, exists} from '@tauri-apps/plugin-fs'
+import { pictureDir, join } from '@tauri-apps/api/path'
+import { useSettingsStore } from './settings-store'
 
 export interface SceneImage {
     id: string
@@ -42,7 +45,7 @@ interface SceneState {
     addScene: (presetId: string, name?: string) => void
     deleteScene: (presetId: string, sceneId: string) => void
     duplicateScene: (presetId: string, sceneId: string) => void
-    renameScene: (presetId: string, sceneId: string, name: string) => void
+    renameScene: (presetId: string, sceneId: string, name: string) => Promise<void>
     updateScenePrompt: (presetId: string, sceneId: string, prompt: string) => void
     updateSceneSettings: (presetId: string, sceneId: string, settings: { width?: number, height?: number }) => void
     updateAllScenesResolution: (presetId: string, width: number, height: number) => void
@@ -219,7 +222,66 @@ export const useSceneStore = create<SceneState>()(
                 }))
             },
 
-            renameScene: (presetId, sceneId, name) => {
+            renameScene: async (presetId, sceneId, name) => {
+                const state = get()
+                const preset = state.presets.find(p => p.id === presetId)
+                const scene = preset?.scenes.find(s => s.id === sceneId)
+                
+                if (!scene || scene.name === name) return
+                
+                const oldName = scene.name
+                const safeOldName = oldName.replace(/[<>:"/\\|?*]/g, '_').trim() || 'Untitled_Scene'
+                const safeNewName = name.replace(/[<>:"/\\|?*]/g, '_').trim() || 'Untitled_Scene'
+                const safePresetName = (preset?.name || 'Default').replace(/[<>:"/\\|?*]/g, '_').trim()
+                
+                // Try to rename the folder
+                try {
+                    const { savePath, useAbsolutePath } = useSettingsStore.getState()
+                    let oldFolderPath: string
+                    let newFolderPath: string
+                    
+                    if (useAbsolutePath && savePath) {
+                        oldFolderPath = await join(savePath, 'NAIS_Scene', safePresetName, safeOldName)
+                        newFolderPath = await join(savePath, 'NAIS_Scene', safePresetName, safeNewName)
+                    } else {
+                        const baseDir = await pictureDir()
+                        oldFolderPath = await join(baseDir, 'NAIS_Scene', safePresetName, safeOldName)
+                        newFolderPath = await join(baseDir, 'NAIS_Scene', safePresetName, safeNewName)
+                    }
+                    
+                    // Only rename if old folder exists and new folder doesn't
+                    if (await exists(oldFolderPath) && !(await exists(newFolderPath))) {
+                        await rename(oldFolderPath, newFolderPath)
+                        
+                        // Update image paths in scene
+                        set(state => ({
+                            presets: state.presets.map(p =>
+                                p.id === presetId
+                                    ? {
+                                        ...p,
+                                        scenes: p.scenes.map(s =>
+                                            s.id === sceneId 
+                                                ? { 
+                                                    ...s, 
+                                                    name,
+                                                    images: s.images.map(img => ({
+                                                        ...img,
+                                                        url: img.url.replace(oldFolderPath, newFolderPath)
+                                                    }))
+                                                } 
+                                                : s
+                                        ),
+                                    }
+                                    : p
+                            ),
+                        }))
+                        return
+                    }
+                } catch (e) {
+                    console.warn('Failed to rename scene folder:', e)
+                }
+                
+                // Fallback: just update the name without folder rename
                 set(state => ({
                     presets: state.presets.map(p =>
                         p.id === presetId
