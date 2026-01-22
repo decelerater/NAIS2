@@ -2444,7 +2444,7 @@ dependencies = [
 
 [[package]]
 name = "nais2"
-version = "2.1.8"
+version = "2.2.0"
 dependencies = [
  "base64 0.22.1",
  "log",

@@ -66,6 +66,8 @@ interface SceneState {
     toggleFavorite: (presetId: string, sceneId: string, imageId: string) => void
     deleteImage: (presetId: string, sceneId: string, imageId: string) => void
     deleteNonFavoriteImages: (presetId: string, sceneId: string) => { count: number; paths: string[] }
+    clearAllFavorites: (presetId: string, sceneId: string) => number
+    deleteAllImages: (presetId: string, sceneId: string) => { count: number; paths: string[] }
     getSceneThumbnail: (scene: SceneCard) => string | undefined
 
     // Actions - Generation
@@ -512,6 +514,62 @@ export const useSceneStore = create<SceneState>()(
                 }))
                 
                 return { count: nonFavoriteCount, paths: filePaths }
+            },
+
+            clearAllFavorites: (presetId, sceneId) => {
+                const preset = get().presets.find(p => p.id === presetId)
+                const scene = preset?.scenes.find(s => s.id === sceneId)
+                if (!scene) return 0
+                
+                const favoriteCount = scene.images.filter(img => img.isFavorite).length
+                
+                set(state => ({
+                    presets: state.presets.map(p =>
+                        p.id === presetId
+                            ? {
+                                ...p,
+                                scenes: p.scenes.map(s =>
+                                    s.id === sceneId
+                                        ? {
+                                            ...s,
+                                            images: s.images.map(img => ({ ...img, isFavorite: false })),
+                                        }
+                                        : s
+                                ),
+                            }
+                            : p
+                    ),
+                }))
+                
+                return favoriteCount
+            },
+
+            deleteAllImages: (presetId, sceneId) => {
+                const preset = get().presets.find(p => p.id === presetId)
+                const scene = preset?.scenes.find(s => s.id === sceneId)
+                if (!scene) return { count: 0, paths: [] }
+                
+                const totalCount = scene.images.length
+                const filePaths = scene.images
+                    .map(img => img.url)
+                    .filter(url => !url.startsWith('data:'))
+                
+                set(state => ({
+                    presets: state.presets.map(p =>
+                        p.id === presetId
+                            ? {
+                                ...p,
+                                scenes: p.scenes.map(s =>
+                                    s.id === sceneId
+                                        ? { ...s, images: [] }
+                                        : s
+                                ),
+                            }
+                            : p
+                    ),
+                }))
+                
+                return { count: totalCount, paths: filePaths }
             },
 
             getSceneThumbnail: (scene) => {

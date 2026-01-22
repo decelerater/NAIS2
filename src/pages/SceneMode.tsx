@@ -68,6 +68,8 @@ import {
     Upload,
     LayoutGrid,
     LayoutList,
+    Star,
+    ImageOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tip } from '@/components/ui/tooltip'
@@ -135,6 +137,8 @@ export default function SceneMode() {
     const deleteSelectedScenes = useSceneStore(s => s.deleteSelectedScenes)
     const moveSelectedScenesToPreset = useSceneStore(s => s.moveSelectedScenesToPreset)
     const updateSelectedScenesResolution = useSceneStore(s => s.updateSelectedScenesResolution)
+    const clearAllFavorites = useSceneStore(s => s.clearAllFavorites)
+    const deleteAllImages = useSceneStore(s => s.deleteAllImages)
 
     // Resolution state for selected scenes
     const [editModeResolution, setEditModeResolution] = useState<Resolution>({
@@ -441,6 +445,60 @@ export default function SceneMode() {
                         <Tip content={t('scene.deleteSelected', '선택 삭제')} shortcut="Del">
                             <Button variant="destructive" size="icon" className="h-9 w-9" onClick={deleteSelectedScenes} disabled={selectedSceneIds.length === 0}>
                                 <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </Tip>
+
+                        <div className="h-6 w-px bg-border" />
+
+                        {/* Clear All Favorites in Selected Scenes */}
+                        <Tip content={t('scene.clearAllFavoritesInSelected', '선택된 씬들의 즐겨찾기 전체 해제')}>
+                            <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-9 w-9" 
+                                onClick={() => {
+                                    if (!activePresetId) return
+                                    let totalCount = 0
+                                    for (const sceneId of selectedSceneIds) {
+                                        totalCount += clearAllFavorites(activePresetId, sceneId)
+                                    }
+                                    if (totalCount > 0) {
+                                        toast({ description: t('scene.clearedFavorites', '{{count}}개 즐겨찾기 해제됨', { count: totalCount }) })
+                                    }
+                                }} 
+                                disabled={selectedSceneIds.length === 0}
+                            >
+                                <Star className="h-4 w-4" />
+                            </Button>
+                        </Tip>
+
+                        {/* Delete All Images in Selected Scenes */}
+                        <Tip content={t('scene.deleteAllImagesInSelected', '선택된 씬들의 이미지 전체 삭제')}>
+                            <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10" 
+                                onClick={async () => {
+                                    if (!activePresetId) return
+                                    let totalCount = 0
+                                    const allPaths: string[] = []
+                                    for (const sceneId of selectedSceneIds) {
+                                        const { count, paths } = deleteAllImages(activePresetId, sceneId)
+                                        totalCount += count
+                                        allPaths.push(...paths)
+                                    }
+                                    // Delete actual files
+                                    const { remove } = await import('@tauri-apps/plugin-fs')
+                                    for (const filePath of allPaths) {
+                                        try { await remove(filePath) } catch (e) { console.warn('Delete failed:', e) }
+                                    }
+                                    if (totalCount > 0) {
+                                        toast({ description: t('scene.deletedAllImages', '{{count}}개 이미지 전체 삭제됨', { count: totalCount }) })
+                                    }
+                                }} 
+                                disabled={selectedSceneIds.length === 0}
+                            >
+                                <ImageOff className="h-4 w-4" />
                             </Button>
                         </Tip>
 

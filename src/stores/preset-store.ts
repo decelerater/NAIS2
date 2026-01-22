@@ -182,21 +182,8 @@ export const usePresetStore = create<PresetState>()(
                 // Set active preset
                 set({ activePresetId: id })
 
-                // Load preset values into generation store
-                const genStore = useGenerationStore.getState()
-                genStore.setBasePrompt(preset.basePrompt)
-                genStore.setAdditionalPrompt(preset.additionalPrompt)
-                genStore.setDetailPrompt(preset.detailPrompt)
-                genStore.setNegativePrompt(preset.negativePrompt)
-                genStore.setModel(preset.model)
-                genStore.setSteps(preset.steps)
-                genStore.setCfgScale(preset.cfgScale)
-                genStore.setCfgRescale(preset.cfgRescale)
-                genStore.setSampler(preset.sampler)
-                genStore.setScheduler(preset.scheduler)
-                genStore.setSmea(preset.smea)
-                genStore.setSmeaDyn(preset.smeaDyn)
-                genStore.setSelectedResolution(preset.selectedResolution)
+                // Load preset values into generation store (single batch update)
+                useGenerationStore.getState().applyPreset(preset)
             },
 
             renamePreset: (id, name) => {

@@ -176,6 +176,23 @@ interface GenerationState {
     setI2IMode: (mode: 'i2i' | 'inpaint' | null) => void
     resetI2IParams: () => void
 
+    // Batch update for preset loading (avoids multiple IndexedDB writes)
+    applyPreset: (preset: {
+        basePrompt: string
+        additionalPrompt: string
+        detailPrompt: string
+        negativePrompt: string
+        model: string
+        steps: number
+        cfgScale: number
+        cfgRescale: number
+        sampler: string
+        scheduler: string
+        smea: boolean
+        smeaDyn: boolean
+        selectedResolution: Resolution
+    }) => void
+
     generate: () => Promise<void>
     cancelGeneration: () => void
     addToHistory: (item: HistoryItem) => void
@@ -248,6 +265,23 @@ export const useGenerationStore = create<GenerationState>()(
             setCfgScale: (cfgScale) => set({ cfgScale }),
             setCfgRescale: (cfgRescale) => set({ cfgRescale }),
             setSampler: (sampler) => set({ sampler }),
+
+            // Batch update - single IndexedDB write instead of 13 separate writes
+            applyPreset: (preset) => set({
+                basePrompt: preset.basePrompt,
+                additionalPrompt: preset.additionalPrompt,
+                detailPrompt: preset.detailPrompt,
+                negativePrompt: preset.negativePrompt,
+                model: preset.model,
+                steps: preset.steps,
+                cfgScale: preset.cfgScale,
+                cfgRescale: preset.cfgRescale,
+                sampler: preset.sampler,
+                scheduler: preset.scheduler,
+                smea: preset.smea,
+                smeaDyn: preset.smeaDyn,
+                selectedResolution: preset.selectedResolution,
+            }),
             setScheduler: (scheduler) => set({ scheduler }),
             setSmea: (smea) => set({ smea }),
             setSmeaDyn: (smeaDyn) => set({ smeaDyn }),
