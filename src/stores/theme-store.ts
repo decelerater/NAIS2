@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { indexedDBStorage } from '@/lib/indexed-db'
 
 type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -19,6 +20,7 @@ export const useThemeStore = create<ThemeState>()(
         }),
         {
             name: 'nais2-theme',
+            storage: createJSONStorage(() => indexedDBStorage),
             onRehydrateStorage: () => (state) => {
                 if (state) {
                     applyTheme(state.theme)

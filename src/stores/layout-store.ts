@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { indexedDBStorage } from '@/lib/indexed-db'
 
 interface LayoutState {
     leftSidebarVisible: boolean
@@ -22,6 +23,7 @@ export const useLayoutStore = create<LayoutState>()(
         }),
         {
             name: 'nais2-layout',
+            storage: createJSONStorage(() => indexedDBStorage),
         }
     )
 )

@@ -242,7 +242,7 @@ export const useLibraryStore = create<LibraryState>()(
             }),
         }),
         {
-            name: 'nais-library-storage',
+            name: 'nais2-library',
             storage: createJSONStorage(() => indexedDBStorage),
             partialize: (state) => ({ items: state.items, gridColumns: state.gridColumns }), // Don't persist draggedSource, editMode, selection
         }

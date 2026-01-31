@@ -26,6 +26,11 @@ export interface Preset {
     scheduler: string
     smea: boolean
     smeaDyn: boolean
+    variety: boolean
+
+    // Quality & UC
+    qualityToggle: boolean
+    ucPreset: number
 
     // Resolution
     selectedResolution: {
@@ -52,6 +57,9 @@ const createDefaultPreset = (): Preset => ({
     scheduler: 'karras',
     smea: true,
     smeaDyn: true,
+    variety: false,
+    qualityToggle: true,
+    ucPreset: 0,
     selectedResolution: { label: 'Portrait', width: 832, height: 1216 },
 })
 
@@ -96,6 +104,9 @@ export const usePresetStore = create<PresetState>()(
                     scheduler: 'karras',
                     smea: true,
                     smeaDyn: true,
+                    variety: false,
+                    qualityToggle: true,
+                    ucPreset: 0,
                     selectedResolution: { label: 'Portrait', width: 832, height: 1216 },
                 }
 
@@ -118,6 +129,9 @@ export const usePresetStore = create<PresetState>()(
                 genStore.setScheduler('karras')
                 genStore.setSmea(true)
                 genStore.setSmeaDyn(true)
+                genStore.setVariety(false)
+                genStore.setQualityToggle(true)
+                genStore.setUcPreset(0)
                 genStore.setSelectedResolution({ label: 'Portrait', width: 832, height: 1216 })
             },
 
@@ -163,6 +177,9 @@ export const usePresetStore = create<PresetState>()(
                                 scheduler: genStore.scheduler,
                                 smea: genStore.smea,
                                 smeaDyn: genStore.smeaDyn,
+                                variety: genStore.variety,
+                                qualityToggle: genStore.qualityToggle,
+                                ucPreset: genStore.ucPreset,
                                 selectedResolution: genStore.selectedResolution,
                             }
                             : p
@@ -217,13 +234,22 @@ export const usePresetStore = create<PresetState>()(
         {
             name: 'nais2-presets',
             storage: createJSONStorage(() => indexedDBStorage),
-            // Ensure default preset exists on hydration
+            // Ensure default preset exists and migrate old presets missing new fields
             onRehydrateStorage: () => (state) => {
                 if (state && !state.presets.find(p => p.id === DEFAULT_PRESET_ID)) {
                     state.presets = [createDefaultPreset(), ...state.presets]
                 }
                 if (state && !state.activePresetId) {
                     state.activePresetId = DEFAULT_PRESET_ID
+                }
+                // Migrate old presets missing variety/qualityToggle/ucPreset fields
+                if (state) {
+                    state.presets = state.presets.map(p => ({
+                        ...p,
+                        variety: p.variety ?? false,
+                        qualityToggle: p.qualityToggle ?? true,
+                        ucPreset: p.ucPreset ?? 0,
+                    }))
                 }
             }
         }
@@ -244,7 +270,8 @@ useGenerationStore.subscribe((state, prevState) => {
     const fieldsToWatch = [
         'basePrompt', 'additionalPrompt', 'detailPrompt', 'negativePrompt',
         'model', 'steps', 'cfgScale', 'cfgRescale',
-        'sampler', 'scheduler', 'smea', 'smeaDyn', 'selectedResolution'
+        'sampler', 'scheduler', 'smea', 'smeaDyn', 'variety',
+        'qualityToggle', 'ucPreset', 'selectedResolution'
     ] as const
 
     const hasChange = fieldsToWatch.some(field => state[field] !== prevState[field])

@@ -280,11 +280,34 @@ function binaryToBytes(binStr: string): Uint8Array {
 }
 
 /**
+ * Detect image MIME type from bytes
+ */
+function detectImageType(bytes: Uint8Array): string {
+    // PNG: 89 50 4E 47 0D 0A 1A 0A
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+        return 'image/png'
+    }
+    // WebP: RIFF....WEBP
+    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+        bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+        return 'image/webp'
+    }
+    // JPEG: FF D8 FF
+    if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+        return 'image/jpeg'
+    }
+    // Default to PNG
+    return 'image/png'
+}
+
+/**
  * Load image and get ImageData using Canvas API
+ * Supports PNG, WebP, JPEG
  */
 async function getImageData(imageBytes: Uint8Array): Promise<ImageData | null> {
     return new Promise((resolve) => {
-        const blob = new Blob([new Uint8Array(imageBytes.buffer as ArrayBuffer, imageBytes.byteOffset, imageBytes.byteLength)], { type: 'image/png' })
+        const mimeType = detectImageType(imageBytes)
+        const blob = new Blob([new Uint8Array(imageBytes.buffer as ArrayBuffer, imageBytes.byteOffset, imageBytes.byteLength)], { type: mimeType })
         const url = URL.createObjectURL(blob)
         const img = new Image()
 
@@ -316,26 +339,34 @@ async function getImageData(imageBytes: Uint8Array): Promise<ImageData | null> {
 }
 
 /**
- * Parse PNG tEXt chunk metadata
- * NAI stores JSON in the "Comment" tEXt chunk
+ * Parse image metadata (PNG tEXt chunks or stealth alpha channel)
+ * Supports PNG and WebP formats
  */
 export async function parseNAIMetadata(imageData: ArrayBuffer | Uint8Array): Promise<NAIMetadata | null> {
     try {
         const bytes = imageData instanceof ArrayBuffer ? new Uint8Array(imageData) : imageData
+        const imageType = detectImageType(bytes)
+        
+        let metadata: NAIMetadata | null = null
 
-        // Check PNG signature
-        const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10]
-        for (let i = 0; i < 8; i++) {
-            if (bytes[i] !== pngSignature[i]) {
-                console.error('Not a valid PNG file')
-                return null
+        // For PNG files, try tEXt chunks first (faster)
+        if (imageType === 'image/png') {
+            // Check PNG signature
+            const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10]
+            let isPng = true
+            for (let i = 0; i < 8; i++) {
+                if (bytes[i] !== pngSignature[i]) {
+                    isPng = false
+                    break
+                }
+            }
+            
+            if (isPng) {
+                metadata = await extractTextChunkMetadata(bytes)
             }
         }
 
-        // First, try to extract from tEXt chunks (faster)
-        let metadata = await extractTextChunkMetadata(bytes)
-
-        // If tEXt chunk failed, try stealth alpha channel
+        // If no metadata found yet, try stealth alpha channel (works for PNG/WebP)
         if (!metadata) {
             const imgData = await getImageData(bytes)
             if (imgData) {

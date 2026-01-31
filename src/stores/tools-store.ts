@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { indexedDBStorage } from '@/lib/indexed-db'
 
 interface ToolsState {
     activeImage: string | null
@@ -31,7 +32,8 @@ export const useToolsStore = create<ToolsState>()(
             setInpaintingBrushSize: (size) => set({ inpaintingBrushSize: size }),
         }),
         {
-            name: 'tools-storage',
+            name: 'nais2-tools',
+            storage: createJSONStorage(() => indexedDBStorage),
             partialize: (state) => ({
                 mosaicPixelSize: state.mosaicPixelSize,
                 mosaicBrushSize: state.mosaicBrushSize,

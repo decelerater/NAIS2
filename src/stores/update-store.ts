@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { indexedDBStorage } from '@/lib/indexed-db'
 import { Update, check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 
@@ -67,7 +68,8 @@ export const useUpdateStore = create<UpdateStore>()(
             },
         }),
         {
-            name: 'nais-update',
+            name: 'nais2-update',
+            storage: createJSONStorage(() => indexedDBStorage),
             partialize: (state) => ({
                 // Only persist pendingUpdate info, not the actual Update object
                 pendingUpdate: state.pendingUpdate,

@@ -190,6 +190,9 @@ interface GenerationState {
         scheduler: string
         smea: boolean
         smeaDyn: boolean
+        variety?: boolean
+        qualityToggle?: boolean
+        ucPreset?: number
         selectedResolution: Resolution
     }) => void
 
@@ -266,7 +269,7 @@ export const useGenerationStore = create<GenerationState>()(
             setCfgRescale: (cfgRescale) => set({ cfgRescale }),
             setSampler: (sampler) => set({ sampler }),
 
-            // Batch update - single IndexedDB write instead of 13 separate writes
+            // Batch update - single IndexedDB write instead of 16 separate writes
             applyPreset: (preset) => set({
                 basePrompt: preset.basePrompt,
                 additionalPrompt: preset.additionalPrompt,
@@ -280,6 +283,9 @@ export const useGenerationStore = create<GenerationState>()(
                 scheduler: preset.scheduler,
                 smea: preset.smea,
                 smeaDyn: preset.smeaDyn,
+                variety: preset.variety ?? false,
+                qualityToggle: preset.qualityToggle ?? true,
+                ucPreset: preset.ucPreset ?? 0,
                 selectedResolution: preset.selectedResolution,
             }),
             setScheduler: (scheduler) => set({ scheduler }),

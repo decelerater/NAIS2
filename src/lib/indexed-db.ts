@@ -94,6 +94,54 @@ export async function cleanupLargeData(key: string, maxSizeKB: number = 100): Pr
 }
 
 /**
+ * IndexedDB 내부에서 스토어 이름 변경 마이그레이션
+ * 기존 이름의 데이터가 있고 새 이름에 데이터가 없으면 이동
+ * 
+ * @param renames - [oldName, newName] 배열
+ */
+export async function migrateIndexedDBKeys(renames: [string, string][]): Promise<void> {
+    for (const [oldKey, newKey] of renames) {
+        try {
+            // 새 키에 이미 데이터가 있으면 스킵
+            const newData = await indexedDBStorage.getItem(newKey)
+            if (newData) {
+                console.log(`[IndexedDB Migration] ${newKey}: Already has data, skipping`)
+                // 기존 키 정리
+                const oldData = await indexedDBStorage.getItem(oldKey)
+                if (oldData) {
+                    await indexedDBStorage.removeItem(oldKey)
+                    console.log(`[IndexedDB Migration] ${oldKey}: Cleaned up old key`)
+                }
+                continue
+            }
+
+            // 기존 키에 데이터가 있는지 확인
+            const oldData = await indexedDBStorage.getItem(oldKey)
+            if (!oldData) {
+                console.log(`[IndexedDB Migration] ${oldKey}: No data to migrate`)
+                continue
+            }
+
+            // 새 키로 복사
+            console.log(`[IndexedDB Migration] ${oldKey} → ${newKey}: Migrating ${oldData.length} bytes`)
+            await indexedDBStorage.setItem(newKey, oldData)
+
+            // 검증
+            const verifyData = await indexedDBStorage.getItem(newKey)
+            if (verifyData && verifyData.length === oldData.length) {
+                // 검증 성공 - 기존 키 삭제
+                await indexedDBStorage.removeItem(oldKey)
+                console.log(`[IndexedDB Migration] ${oldKey} → ${newKey}: Complete`)
+            } else {
+                console.error(`[IndexedDB Migration] ${oldKey} → ${newKey}: Verification failed!`)
+            }
+        } catch (error) {
+            console.error(`[IndexedDB Migration] ${oldKey} → ${newKey}: Failed`, error)
+        }
+    }
+}
+
+/**
  * localStorage에서 IndexedDB로 데이터 마이그레이션
  * 기존 localStorage 데이터가 있고 IndexedDB에 없으면 이동
  * 
