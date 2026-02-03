@@ -1,12 +1,19 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+// 참조 레퍼런스 타입 (NovelAI 2026년 2월 업데이트)
+export type PreciseReferenceType = 'character' | 'style' | 'character&style'
+
 export interface ReferenceImage {
     id: string
     base64: string
+    enabled: boolean // 활성화/비활성화 (새로 추가)
     encodedVibe?: string  // Pre-encoded vibe data from PNG metadata (skips /ai/encode-vibe API)
-    informationExtracted: number // 0 to 1
-    strength: number // 0 to 1 (or higher depending on API? usually 0-1)
+    informationExtracted: number // 0 to 1 (Vibe Transfer용)
+    strength: number // 0 to 1 - 참조 레퍼런스의 Strength
+    fidelity: number // 0 to 1 - 참조 레퍼런스의 Fidelity
+    referenceType: PreciseReferenceType // 참조 타입 (character/style/character&style)
+    cacheKey?: string // 서버 캐시 키 (이미지 재전송 방지)
 }
 
 interface CharacterState {
@@ -40,8 +47,11 @@ export const useCharacterStore = create<CharacterState>()(
                     {
                         id: Date.now().toString(),
                         base64,
+                        enabled: true,
                         informationExtracted: 1.0,
-                        strength: 0.6
+                        strength: 0.6,
+                        fidelity: 0.6,
+                        referenceType: 'character&style' as PreciseReferenceType
                     }
                 ]
             })),
@@ -64,9 +74,12 @@ export const useCharacterStore = create<CharacterState>()(
                         {
                             id: Date.now().toString(),
                             base64,
+                            enabled: true,
                             encodedVibe,
                             informationExtracted: informationExtracted ?? 1.0,
-                            strength: strength ?? 0.6
+                            strength: strength ?? 0.6,
+                            fidelity: 0.6,
+                            referenceType: 'character&style' as PreciseReferenceType
                         }
                     ]
                 }))

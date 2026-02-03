@@ -135,8 +135,9 @@ export function useSceneGeneration() {
                 // processWildcards handles both <filename> fragments and (a/b/c) random selection
                 const finalPrompt = await processWildcards(parts.join(', '))
 
-                // Get Character & Vibe Data
-                const { characterImages, vibeImages } = characterStore
+                // Get Character & Vibe Data (활성화된 이미지만 필터링)
+                const characterImages = characterStore.characterImages.filter(img => img.enabled !== false)
+                const vibeImages = characterStore.vibeImages.filter(img => img.enabled !== false)
                 const { characters: characterPrompts } = characterPromptStore
 
                 // Apply fragment/wildcard substitution to character prompts (async)
@@ -201,10 +202,12 @@ export function useSceneGeneration() {
                     noise: genState.noise,
                     mask: genState.mask || undefined,
 
-                    // Character Reference
+                    // Precise Reference (캐릭터 참조)
                     charImages: characterImages.map(img => img.base64),
-                    charInfo: characterImages.map(img => img.informationExtracted),
                     charStrength: characterImages.map(img => img.strength),
+                    charFidelity: characterImages.map(img => img.fidelity ?? 0.6),
+                    charReferenceType: characterImages.map(img => img.referenceType ?? 'character&style'),
+                    charCacheKeys: characterImages.map(img => img.cacheKey || null),
 
                     // Vibe Transfer
                     vibeImages: vibeImages.map(img => img.base64),

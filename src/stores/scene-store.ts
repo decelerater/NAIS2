@@ -945,12 +945,31 @@ export const useSceneStore = create<SceneState>()(
                 gridColumns: state.gridColumns,
                 thumbnailLayout: state.thumbnailLayout,
             }),
-            onRehydrateStorage: () => (state) => {
-                if (state && !state.presets.find(p => p.id === DEFAULT_PRESET_ID)) {
-                    state.presets = [createDefaultPreset(), ...state.presets]
+            onRehydrateStorage: () => (state, error) => {
+                if (error) {
+                    console.error('[SceneStore] Hydration failed:', error)
+                    return
                 }
-                if (state && !state.activePresetId) {
-                    state.activePresetId = DEFAULT_PRESET_ID
+                
+                if (state) {
+                    // 복원 로그
+                    const presetCount = state.presets?.length || 0
+                    const totalScenes = state.presets?.reduce((sum, p) => sum + (p.scenes?.length || 0), 0) || 0
+                    console.log(`[SceneStore] Hydrated: ${presetCount} presets, ${totalScenes} total scenes`)
+                    
+                    // 기본 프리셋 보장
+                    if (!state.presets.find(p => p.id === DEFAULT_PRESET_ID)) {
+                        console.log('[SceneStore] Adding default preset')
+                        state.presets = [createDefaultPreset(), ...state.presets]
+                    }
+                    if (!state.activePresetId) {
+                        state.activePresetId = DEFAULT_PRESET_ID
+                    }
+                    
+                    // 씬 데이터 손실 경고
+                    if (presetCount === 1 && totalScenes === 0) {
+                        console.warn('[SceneStore] Warning: Only default preset with no scenes - possible data loss')
+                    }
                 }
             },
         }

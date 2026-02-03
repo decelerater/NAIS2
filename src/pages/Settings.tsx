@@ -34,6 +34,10 @@ import {
     Timer,
     Sparkles,
     Keyboard,
+    Upload,
+    Database,
+    AlertTriangle,
+    HardDrive,
 } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
@@ -44,11 +48,13 @@ import { useShortcutStore, SHORTCUT_ACTIONS, formatKeyBinding, type ShortcutActi
 import { toast } from '@/components/ui/use-toast'
 import NovelAILogo from '@/assets/novelai_logo.svg'
 import GeminiIcon from '@/assets/gemini-color.svg'
-import { open } from '@tauri-apps/plugin-dialog'
+import { open, save } from '@tauri-apps/plugin-dialog'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { getVersion } from '@tauri-apps/api/app'
 import { useUpdateStore, setCurrentUpdateObject, installPendingUpdate } from '@/stores/update-store'
+import { exportAllData, importAllData, getStoreSizes } from '@/lib/indexed-db'
+import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs'
 
 const LANGUAGES = [
     { code: 'ko', name: '한국어' },
@@ -56,7 +62,7 @@ const LANGUAGES = [
     { code: 'ja', name: '日本語' },
 ]
 
-type SettingsSection = 'general' | 'appearance' | 'api' | 'storage' | 'shortcuts'
+type SettingsSection = 'general' | 'appearance' | 'api' | 'storage' | 'shortcuts' | 'backup'
 
 const SECTIONS = [
     { id: 'general' as const, icon: Settings2, labelKey: 'settingsPage.sections.general' },
@@ -64,6 +70,7 @@ const SECTIONS = [
     { id: 'api' as const, icon: Key, labelKey: 'settingsPage.sections.api' },
     { id: 'storage' as const, icon: FolderOpen, labelKey: 'settingsPage.sections.storage' },
     { id: 'shortcuts' as const, icon: Keyboard, labelKey: 'settingsPage.sections.shortcuts' },
+    { id: 'backup' as const, icon: Database, labelKey: 'settingsPage.backup.title' },
 ]
 
 export default function Settings() {
@@ -90,10 +97,26 @@ export default function Settings() {
     // 키바인드 편집 상태
     const [editingAction, setEditingAction] = useState<ShortcutAction | null>(null)
     const [recordedBinding, setRecordedBinding] = useState<KeyBinding | null>(null)
+    
+    // 백업 관련 상태
+    const [isExporting, setIsExporting] = useState(false)
+    const [isImporting, setIsImporting] = useState(false)
+    const [storeSizes, setStoreSizes] = useState<{ [key: string]: number }>({})
+    const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
 
     useEffect(() => {
         getVersion().then(setAppVersion).catch(() => setAppVersion('dev'))
+        // 마지막 백업 시간 로드
+        const lastBackup = localStorage.getItem('nais2-last-backup-time')
+        if (lastBackup) setLastBackupTime(lastBackup)
     }, [])
+    
+    // 데이터 크기 로드 (backup 섹션 진입 시)
+    useEffect(() => {
+        if (activeSection === 'backup') {
+            getStoreSizes().then(setStoreSizes).catch(console.error)
+        }
+    }, [activeSection])
 
     useEffect(() => {
         if (token) {
@@ -172,6 +195,115 @@ export default function Settings() {
         setLibraryPath('NAIS_Library', false)
         toast({ title: t('settingsPage.saved'), variant: 'success' })
     }
+    
+    // 백업 내보내기
+    const handleExportBackup = async () => {
+        setIsExporting(true)
+        try {
+            const backup = await exportAllData()
+            const storeCount = Object.keys(backup).filter(k => !k.startsWith('_')).length
+            
+            // 파일 저장 다이얼로그
+            const filePath = await save({
+                title: t('settingsPage.backup.export'),
+                defaultPath: `nais2-backup-${new Date().toISOString().split('T')[0]}.json`,
+                filters: [{ name: 'JSON', extensions: ['json'] }]
+            })
+            
+            if (filePath) {
+                await writeTextFile(filePath, JSON.stringify(backup, null, 2))
+                
+                // 마지막 백업 시간 저장
+                const now = new Date().toISOString()
+                localStorage.setItem('nais2-last-backup-time', now)
+                setLastBackupTime(now)
+                
+                toast({
+                    title: t('settingsPage.backup.exported'),
+                    description: t('settingsPage.backup.exportedDesc', { count: storeCount }),
+                    variant: 'success',
+                })
+            }
+        } catch (err) {
+            console.error('Backup export failed:', err)
+            toast({
+                title: t('settingsPage.backup.exportFailed'),
+                description: String(err),
+                variant: 'destructive',
+            })
+        } finally {
+            setIsExporting(false)
+        }
+    }
+    
+    // 백업 복원
+    const handleImportBackup = async () => {
+        try {
+            // 파일 선택 다이얼로그
+            const filePath = await open({
+                title: t('settingsPage.backup.import'),
+                filters: [{ name: 'JSON', extensions: ['json'] }],
+                multiple: false,
+            })
+            
+            if (!filePath || typeof filePath !== 'string') return
+            
+            // 확인 다이얼로그
+            const confirmed = window.confirm(
+                `${t('settingsPage.backup.confirmRestoreDesc')}\n\n${t('settingsPage.backup.restoreWarning')}`
+            )
+            if (!confirmed) return
+            
+            setIsImporting(true)
+            
+            const content = await readTextFile(filePath)
+            const backup = JSON.parse(content)
+            
+            // 유효성 검증
+            if (!backup._exportedAt || !backup._version) {
+                toast({
+                    title: t('settingsPage.backup.importFailed'),
+                    description: t('settingsPage.backup.invalidFile'),
+                    variant: 'destructive',
+                })
+                return
+            }
+            
+            const result = await importAllData(backup, true)
+            
+            toast({
+                title: t('settingsPage.backup.imported'),
+                description: t('settingsPage.backup.importedDesc', { success: result.success.length }),
+                variant: 'success',
+            })
+            
+            // 앱 재시작
+            setTimeout(() => {
+                relaunch()
+            }, 1500)
+            
+        } catch (err) {
+            console.error('Backup import failed:', err)
+            toast({
+                title: t('settingsPage.backup.importFailed'),
+                description: String(err),
+                variant: 'destructive',
+            })
+        } finally {
+            setIsImporting(false)
+        }
+    }
+    
+    // 데이터 크기 포맷팅
+    const formatSize = (bytes: number) => {
+        if (bytes < 0) return 'Error'
+        if (bytes === 0) return '0 B'
+        if (bytes < 1024) return `${bytes} B`
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+    }
+    
+    const totalSize = Object.values(storeSizes).reduce((sum, size) => sum + (size > 0 ? size : 0), 0)
 
     return (
         <div className="flex h-full">
@@ -882,6 +1014,124 @@ export default function Settings() {
                                             t={t}
                                         />
                                     ))}
+                                </div>
+                            </div>
+                        </section>
+                    )}
+                    
+                    {/* Backup Section */}
+                    {activeSection === 'backup' && (
+                        <section className="space-y-6">
+                            <div>
+                                <h3 className="text-xl font-semibold">{t('settingsPage.backup.title')}</h3>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    {t('settingsPage.backup.description')}
+                                </p>
+                            </div>
+                            
+                            {/* Export/Import */}
+                            <div className="border border-border/50 rounded-xl p-6 space-y-6 bg-card/30">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <label className="text-sm font-medium flex items-center gap-2">
+                                            <Download className="h-4 w-4 text-blue-500" />
+                                            {t('settingsPage.backup.export')}
+                                        </label>
+                                        <p className="text-xs text-muted-foreground">
+                                            {t('settingsPage.backup.exportDesc')}
+                                        </p>
+                                    </div>
+                                    <Button onClick={handleExportBackup} disabled={isExporting}>
+                                        {isExporting ? (
+                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                        ) : (
+                                            <Download className="h-4 w-4 mr-2" />
+                                        )}
+                                        {isExporting ? t('settingsPage.backup.exporting') : t('settingsPage.backup.export')}
+                                    </Button>
+                                </div>
+                                
+                                <div className="border-t border-border/30 pt-6">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-medium flex items-center gap-2">
+                                                <Upload className="h-4 w-4 text-green-500" />
+                                                {t('settingsPage.backup.import')}
+                                            </label>
+                                            <p className="text-xs text-muted-foreground">
+                                                {t('settingsPage.backup.importDesc')}
+                                            </p>
+                                        </div>
+                                        <Button variant="outline" onClick={handleImportBackup} disabled={isImporting}>
+                                            {isImporting ? (
+                                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                            ) : (
+                                                <Upload className="h-4 w-4 mr-2" />
+                                            )}
+                                            {isImporting ? t('settingsPage.backup.importing') : t('settingsPage.backup.import')}
+                                        </Button>
+                                    </div>
+                                </div>
+                                
+                                {/* Last Backup Time */}
+                                {lastBackupTime && (
+                                    <div className="border-t border-border/30 pt-4">
+                                        <p className="text-xs text-muted-foreground">
+                                            {t('settingsPage.backup.lastBackup')}: {new Date(lastBackupTime).toLocaleString()}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {/* Data Sizes */}
+                            <div className="border border-border/50 rounded-xl p-6 space-y-4 bg-card/30">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-medium flex items-center gap-2">
+                                        <HardDrive className="h-4 w-4 text-muted-foreground" />
+                                        {t('settingsPage.backup.sizes')}
+                                    </h4>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={() => getStoreSizes().then(setStoreSizes)}
+                                    >
+                                        <RefreshCw className="h-3 w-3 mr-1" />
+                                        {t('common.change', 'Refresh')}
+                                    </Button>
+                                </div>
+                                
+                                <div className="space-y-2 text-sm">
+                                    {Object.entries(storeSizes).map(([key, size]) => (
+                                        <div key={key} className="flex items-center justify-between py-1">
+                                            <span className="text-muted-foreground">
+                                                {key.replace('nais2-', '')}
+                                            </span>
+                                            <span className={cn(
+                                                "font-mono",
+                                                size > 1024 * 1024 && "text-yellow-500",
+                                                size > 5 * 1024 * 1024 && "text-red-500"
+                                            )}>
+                                                {formatSize(size)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                    <div className="border-t border-border/30 pt-2 flex items-center justify-between font-medium">
+                                        <span>{t('settingsPage.backup.totalSize')}</span>
+                                        <span className="font-mono">{formatSize(totalSize)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Warning */}
+                            <div className="border border-yellow-500/30 rounded-xl p-4 bg-yellow-500/5">
+                                <div className="flex gap-3">
+                                    <AlertTriangle className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
+                                    <div className="text-sm text-yellow-600 dark:text-yellow-400">
+                                        <p className="font-medium">{t('settingsPage.backup.restoreWarning')}</p>
+                                        <p className="text-xs mt-1 opacity-80">
+                                            {t('settingsPage.backup.confirmRestoreDesc')}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </section>

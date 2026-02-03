@@ -108,6 +108,15 @@ export const useSettingsStore = create<SettingsState>()(
         {
             name: 'nais2-settings',
             storage: createJSONStorage(() => indexedDBStorage),
+            onRehydrateStorage: () => (state, error) => {
+                if (error) {
+                    console.error('[SettingsStore] Hydration failed:', error)
+                    return
+                }
+                if (state) {
+                    console.log('[SettingsStore] Hydrated successfully')
+                }
+            },
         }
     )
 )

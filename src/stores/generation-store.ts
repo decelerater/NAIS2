@@ -405,8 +405,10 @@ export const useGenerationStore = create<GenerationState>()(
                             set({ seed: currentSeed })
                         }
 
-                        // Character & Vibe Data
-                        const { characterImages, vibeImages } = useCharacterStore.getState()
+                        // Character & Vibe Data (활성화된 이미지만 필터링)
+                        const { characterImages: allCharImages, vibeImages: allVibeImages } = useCharacterStore.getState()
+                        const characterImages = allCharImages.filter(img => img.enabled !== false)
+                        const vibeImages = allVibeImages.filter(img => img.enabled !== false)
 
                         // Character Prompts (Position-based)
                         const { characters: characterPrompts, positionEnabled } = useCharacterPromptStore.getState()
@@ -474,10 +476,12 @@ export const useGenerationStore = create<GenerationState>()(
                             noise,
                             mask: mask || undefined,
 
-                            // Character Reference
+                            // Precise Reference (캐릭터 참조)
                             charImages: characterImages.map(img => img.base64),
-                            charInfo: characterImages.map(img => img.informationExtracted),
                             charStrength: characterImages.map(img => img.strength),
+                            charFidelity: characterImages.map(img => img.fidelity ?? 0.6),
+                            charReferenceType: characterImages.map(img => img.referenceType ?? 'character&style'),
+                            charCacheKeys: characterImages.map(img => img.cacheKey || null),
 
                             // Vibe Transfer
                             vibeImages: vibeImages.map(img => img.base64),
@@ -731,11 +735,18 @@ export const useGenerationStore = create<GenerationState>()(
                 // History - limit to 20 items to prevent memory issues
                 history: state.history.slice(0, 20),
             }),
-            onRehydrateStorage: () => (state) => {
+            onRehydrateStorage: () => (state, error) => {
+                if (error) {
+                    console.error('[GenerationStore] Hydration failed:', error)
+                    return
+                }
                 // Trim history to 20 items on load to prevent OOM
                 if (state && state.history && state.history.length > 20) {
                     console.log(`[GenerationStore] Trimming history from ${state.history.length} to 20 items`)
                     state.history = state.history.slice(0, 20)
+                }
+                if (state) {
+                    console.log('[GenerationStore] Hydrated successfully')
                 }
             },
         }

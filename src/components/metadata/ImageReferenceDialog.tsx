@@ -23,6 +23,9 @@ export function ImageReferenceDialog({ open, onOpenChange, imageBase64 }: ImageR
     const { t } = useTranslation()
     const { addVibeImage, addCharacterImage, characterImages } = useCharacterStore()
     const [isProcessing, setIsProcessing] = useState(false)
+    
+    // 활성화된 참조 레퍼런스 이미지가 있는지 확인
+    const hasEnabledCharacterImages = characterImages.some(img => img.enabled !== false)
 
     const handleAddAsVibe = async () => {
         if (!imageBase64) return
@@ -100,12 +103,12 @@ export function ImageReferenceDialog({ open, onOpenChange, imageBase64 }: ImageR
                         </Button>
 
                         {/* Vibe Transfer Button - Bottom */}
-                        <Tip content={characterImages.length > 0 ? t('characterDialog.vibeDisabledMsg') : undefined}>
+                        <Tip content={hasEnabledCharacterImages ? t('characterDialog.vibeDisabledMsg') : undefined}>
                             <Button
                                 variant="outline"
                                 className="flex-1 flex items-center justify-start gap-3 hover:bg-primary/10 hover:border-primary"
                                 onClick={handleAddAsVibe}
-                                disabled={isProcessing || characterImages.length > 0}
+                                disabled={isProcessing || hasEnabledCharacterImages}
                             >
                                 <Sparkles className="h-6 w-6 text-purple-500 flex-shrink-0" />
                                 <div className="text-left">
@@ -113,7 +116,7 @@ export function ImageReferenceDialog({ open, onOpenChange, imageBase64 }: ImageR
                                         {t('imageRef.vibeTransfer', 'Vibe Transfer')}
                                     </div>
                                     <div className="text-xs text-muted-foreground">
-                                        {characterImages.length > 0
+                                        {hasEnabledCharacterImages
                                             ? <span className="text-destructive font-medium">{t('characterDialog.vibeDisabledMsg')}</span>
                                             : t('imageRef.vibeDesc', '이미지 스타일/분위기 참조')}
                                     </div>

@@ -9,14 +9,21 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Users, Upload, X, Zap, Database, Lock } from 'lucide-react'
+import { Users, Upload, X, Zap, Database, Lock, Eye, EyeOff } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Slider } from '@/components/ui/slider'
 import { Label } from '@/components/ui/label'
 import { Tip } from '@/components/ui/tooltip'
-import { useCharacterStore, ReferenceImage } from '@/stores/character-store'
+import { useCharacterStore, ReferenceImage, PreciseReferenceType } from '@/stores/character-store'
 import { parseMetadataFromBase64 } from '@/lib/metadata-parser'
-
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 
 const SafeSlider = ({
     value,
@@ -134,52 +141,82 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
                     {t('characterDialog.noImages')}
                 </div>
             )}
-            {images.map(img => (
-                <div key={img.id} className="flex gap-4 p-3 border rounded-lg bg-card bg-muted/10">
-                    <div className="relative shrink-0 w-24 h-24 bg-muted rounded-md overflow-hidden border flex items-center justify-center group/image">
-                        {img.base64 ? (
-                            <img src={img.base64} alt="Reference" className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="flex flex-col items-center justify-center text-muted-foreground p-2 text-center">
-                                <Database className="w-8 h-8 opacity-50 mb-1" />
-                                <span className="text-[9px] leading-tight whitespace-pre-line">{t('characterDialog.encodedDataOnly')}</span>
-                            </div>
+            {images.map(img => {
+                const isEnabled = img.enabled !== false
+                return (
+                    <div 
+                        key={img.id} 
+                        className={cn(
+                            "flex gap-4 p-3 border rounded-lg bg-card transition-all",
+                            isEnabled ? "bg-muted/10" : "bg-muted/5 opacity-50"
                         )}
-                        <Button
-                            variant="destructive"
-                            size="icon"
-                            className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-0 group-hover/image:opacity-100 transition-opacity"
-                            onClick={() => onRemove(img.id)}
-                        >
-                            <X className="w-3 h-3" />
-                        </Button>
-                        {/* Pre-encoded indicator */}
-                        {img.encodedVibe && (
-                            <Tip content={t('characterDialog.preEncodedTooltip')}>
-                                <div className="absolute bottom-1 left-1 bg-green-500/90 text-white text-[9px] font-bold rounded px-1 py-0.5 flex items-center gap-0.5">
-                                    <Zap className="w-2.5 h-2.5" />
+                    >
+                        <div className="relative shrink-0 w-24 h-24 bg-muted rounded-md overflow-hidden border flex items-center justify-center group/image">
+                            {img.base64 ? (
+                                <img 
+                                    src={img.base64} 
+                                    alt="Reference" 
+                                    className={cn(
+                                        "w-full h-full object-cover transition-all",
+                                        !isEnabled && "grayscale"
+                                    )} 
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center text-muted-foreground p-2 text-center">
+                                    <Database className="w-8 h-8 opacity-50 mb-1" />
+                                    <span className="text-[9px] leading-tight whitespace-pre-line">{t('characterDialog.encodedDataOnly')}</span>
                                 </div>
+                            )}
+                            <Button
+                                variant="destructive"
+                                size="icon"
+                                className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-0 group-hover/image:opacity-100 transition-opacity"
+                                onClick={() => onRemove(img.id)}
+                            >
+                                <X className="w-3 h-3" />
+                            </Button>
+                            {/* 활성화/비활성화 토글 */}
+                            <Tip content={isEnabled ? t('characterDialog.clickToDisable', '클릭하여 비활성화') : t('characterDialog.clickToEnable', '클릭하여 활성화')}>
+                                <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    className={cn(
+                                        "absolute bottom-1 right-1 h-6 w-6 rounded-full transition-opacity",
+                                        isEnabled ? "bg-green-500/90 hover:bg-green-600" : "bg-gray-500/90 hover:bg-gray-600"
+                                    )}
+                                    onClick={() => onUpdate(img.id, { enabled: !isEnabled })}
+                                >
+                                    {isEnabled ? <Eye className="w-3 h-3 text-white" /> : <EyeOff className="w-3 h-3 text-white" />}
+                                </Button>
                             </Tip>
-                        )}
+                            {/* Pre-encoded indicator */}
+                            {img.encodedVibe && (
+                                <Tip content={t('characterDialog.preEncodedTooltip')}>
+                                    <div className="absolute bottom-1 left-1 bg-green-500/90 text-white text-[9px] font-bold rounded px-1 py-0.5 flex items-center gap-0.5">
+                                        <Zap className="w-2.5 h-2.5" />
+                                    </div>
+                                </Tip>
+                            )}
+                        </div>
+                        <div className={cn("flex-1 space-y-3 min-w-0", !isEnabled && "pointer-events-none")}>
+                            <SafeSlider
+                                label={t('characterDialog.vibeInfoExtracted', '정보 추출률 (Information Extracted)')}
+                                value={[img.informationExtracted]}
+                                onValueCommit={([v]) => onUpdate(img.id, { informationExtracted: v })}
+                            />
+                            <SafeSlider
+                                label={t('characterDialog.vibeStrength', '강도 (Reference Strength)')}
+                                value={[img.strength]}
+                                onValueCommit={([v]) => onUpdate(img.id, { strength: v })}
+                            />
+                        </div>
                     </div>
-                    <div className="flex-1 space-y-3 min-w-0">
-                        <SafeSlider
-                            label={t('characterDialog.vibeInfoExtracted', '정보 추출률 (Information Extracted)')}
-                            value={[img.informationExtracted]}
-                            onValueCommit={([v]) => onUpdate(img.id, { informationExtracted: v })}
-                        />
-                        <SafeSlider
-                            label={t('characterDialog.vibeStrength', '강도 (Reference Strength)')}
-                            value={[img.strength]}
-                            onValueCommit={([v]) => onUpdate(img.id, { strength: v })}
-                        />
-                    </div>
-                </div>
-            ))}
+                )
+            })}
         </div>
     )
 
-    // Character Reference Image List Component
+    // Character Reference Image List Component (참조 레퍼런스)
     const CharacterImageList = ({
         images,
         onRemove,
@@ -195,40 +232,107 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
                     {t('characterDialog.noImages')}
                 </div>
             )}
-            {images.map(img => (
-                <div key={img.id} className="flex gap-4 p-3 border rounded-lg bg-card bg-muted/10">
-                    <div className="relative shrink-0 w-24 h-24 bg-muted rounded-md overflow-hidden border flex items-center justify-center group/image">
-                        <img src={img.base64} alt="Reference" className="w-full h-full object-cover" />
-                        <Button
-                            variant="destructive"
-                            size="icon"
-                            className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-0 group-hover/image:opacity-100 transition-opacity"
-                            onClick={() => onRemove(img.id)}
-                        >
-                            <X className="w-3 h-3" />
-                        </Button>
+            {images.map(img => {
+                const isEnabled = img.enabled !== false // undefined도 true로 취급 (하위 호환)
+                return (
+                    <div 
+                        key={img.id} 
+                        className={cn(
+                            "flex gap-4 p-3 border rounded-lg bg-card transition-all",
+                            isEnabled ? "bg-muted/10" : "bg-muted/5 opacity-50"
+                        )}
+                    >
+                        <div className="relative shrink-0 w-24 h-24 bg-muted rounded-md overflow-hidden border flex items-center justify-center group/image">
+                            <img 
+                                src={img.base64} 
+                                alt="Reference" 
+                                className={cn(
+                                    "w-full h-full object-cover transition-all",
+                                    !isEnabled && "grayscale"
+                                )} 
+                            />
+                            {/* 삭제 버튼 */}
+                            <Button
+                                variant="destructive"
+                                size="icon"
+                                className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-0 group-hover/image:opacity-100 transition-opacity"
+                                onClick={() => onRemove(img.id)}
+                            >
+                                <X className="w-3 h-3" />
+                            </Button>
+                            {/* 활성화/비활성화 토글 */}
+                            <Tip content={isEnabled ? t('characterDialog.clickToDisable', '클릭하여 비활성화') : t('characterDialog.clickToEnable', '클릭하여 활성화')}>
+                                <Button
+                                    variant="secondary"
+                                    size="icon"
+                                    className={cn(
+                                        "absolute bottom-1 right-1 h-6 w-6 rounded-full transition-opacity",
+                                        isEnabled ? "bg-green-500/90 hover:bg-green-600" : "bg-gray-500/90 hover:bg-gray-600"
+                                    )}
+                                    onClick={() => onUpdate(img.id, { enabled: !isEnabled })}
+                                >
+                                    {isEnabled ? <Eye className="w-3 h-3 text-white" /> : <EyeOff className="w-3 h-3 text-white" />}
+                                </Button>
+                            </Tip>
+                            {/* 캐시된 이미지 표시 */}
+                            {img.cacheKey && (
+                                <Tip content={t('characterDialog.cachedTooltip', '서버에 캐시됨 (재전송 불필요)')}>
+                                    <div className="absolute bottom-1 left-1 bg-blue-500/90 text-white text-[9px] font-bold rounded px-1 py-0.5 flex items-center gap-0.5">
+                                        <Zap className="w-2.5 h-2.5" />
+                                    </div>
+                                </Tip>
+                            )}
+                        </div>
+                        <div className={cn("flex-1 space-y-3 min-w-0", !isEnabled && "pointer-events-none")}>
+                            {/* Reference Type - 참조 타입 선택 */}
+                            <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">
+                                    {t('characterDialog.referenceType', '참조 타입')}
+                                </Label>
+                                <Select
+                                    value={img.referenceType || 'character&style'}
+                                    onValueChange={(v) => onUpdate(img.id, { referenceType: v as PreciseReferenceType })}
+                                    disabled={!isEnabled}
+                                >
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="character&style">
+                                            {t('characterDialog.typeCharacterStyle', '캐릭터 & 스타일')}
+                                        </SelectItem>
+                                        <SelectItem value="character">
+                                            {t('characterDialog.typeCharacter', '캐릭터')}
+                                        </SelectItem>
+                                        <SelectItem value="style">
+                                            {t('characterDialog.typeStyle', '스타일')}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            {/* Strength - Slider */}
+                            <SafeSlider
+                                label={t('characterDialog.strength', '강도 (Strength)')}
+                                value={[img.strength]}
+                                onValueCommit={([v]) => onUpdate(img.id, { strength: v })}
+                            />
+                            {/* Fidelity - Slider */}
+                            <SafeSlider
+                                label={t('characterDialog.fidelity', '충실도 (Fidelity)')}
+                                value={[img.fidelity ?? 0.6]}
+                                onValueCommit={([v]) => onUpdate(img.id, { fidelity: v })}
+                            />
+                        </div>
                     </div>
-                    <div className="flex-1 space-y-3 min-w-0">
-                        {/* Style Aware - Toggle (0 or 1 only, like official NAI checkbox) */}
-                        <SafeSlider
-                            label={t('characterDialog.styleAware', '스타일 인지 (Style Aware)')}
-                            value={[img.informationExtracted]}
-                            onValueCommit={([v]) => onUpdate(img.id, { informationExtracted: v })}
-                            step={1}
-                        />
-                        {/* Fidelity - Slider */}
-                        <SafeSlider
-                            label={t('characterDialog.fidelity', '충실도 (Fidelity)')}
-                            value={[img.strength]}
-                            onValueCommit={([v]) => onUpdate(img.id, { strength: v })}
-                        />
-                    </div>
-                </div>
-            ))}
+                )
+            })}
         </div>
     )
 
-    const totalCount = characterImages.length + vibeImages.length
+    // Count only enabled images (enabled !== false or undefined which means enabled)
+    const enabledCharCount = characterImages.filter(img => img.enabled !== false).length
+    const enabledVibeCount = vibeImages.filter(img => img.enabled !== false).length
+    const totalCount = enabledCharCount + enabledVibeCount
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -257,18 +361,16 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
 
                     <TabsContent value="character" className="flex-1 overflow-y-auto min-h-0 pr-1">
                         <div className="py-2">
-                            {characterImages.length === 0 && (
-                                <div
-                                    className="border-2 border-dashed border-muted-foreground/25 rounded-xl p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer"
-                                    onClick={() => charInputRef.current?.click()}
-                                >
-                                    <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                                    <p className="text-sm text-muted-foreground font-medium">{t('characterDialog.uploadCharacter')}</p>
-                                </div>
-                            )}
+                            <div
+                                className="border-2 border-dashed border-muted-foreground/25 rounded-xl p-4 text-center hover:bg-muted/50 transition-colors cursor-pointer mb-4"
+                                onClick={() => charInputRef.current?.click()}
+                            >
+                                <Upload className="w-6 h-6 mx-auto mb-1 text-muted-foreground" />
+                                <p className="text-sm text-muted-foreground font-medium">{t('characterDialog.uploadCharacter')}</p>
+                            </div>
                             <input
                                 type="file"
-                                multiple={false}
+                                multiple
                                 accept="image/*"
                                 className="hidden"
                                 ref={charInputRef}
@@ -284,7 +386,7 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
                     </TabsContent>
 
                     <TabsContent value="vibe" className="flex-1 overflow-y-auto min-h-0 pr-1 relative">
-                        {characterImages.length > 0 && (
+                        {characterImages.some(img => img.enabled !== false) && (
                             <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[1px]">
                                 <Lock className="w-8 h-8 text-muted-foreground mb-2" />
                                 <p className="text-sm font-medium text-muted-foreground text-center px-4">
@@ -292,7 +394,7 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
                                 </p>
                             </div>
                         )}
-                        <div className={characterImages.length > 0 ? "opacity-30 pointer-events-none grayscale filter blur-[1px]" : ""}>
+                        <div className={characterImages.some(img => img.enabled !== false) ? "opacity-30 pointer-events-none grayscale filter blur-[1px]" : ""}>
                             <div className="py-2">
                                 <div
                                     className="border-2 border-dashed border-muted-foreground/25 rounded-xl p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer"

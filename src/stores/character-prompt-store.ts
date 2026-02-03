@@ -344,7 +344,34 @@ export const useCharacterPromptStore = create<CharacterPromptState>()(
         {
             name: 'nais2-character-prompts',
             storage: createJSONStorage(() => indexedDBStorage),
-            version: 1 // Increment version if needed for migration logic handling in persist (optional)
+            version: 1,
+            // 데이터 보호: hydration 후 검증
+            onRehydrateStorage: () => (state, error) => {
+                if (error) {
+                    console.error('[CharacterPromptStore] Hydration failed:', error)
+                    return
+                }
+                
+                if (state) {
+                    // 정상 복원 로그
+                    const presetCount = state.presets?.length || 0
+                    const charCount = state.characters?.length || 0
+                    const groupCount = state.groups?.length || 0
+                    console.log(`[CharacterPromptStore] Hydrated: ${presetCount} presets, ${charCount} characters, ${groupCount} groups`)
+                    
+                    // 빈 배열이면 경고 (데이터 손실 가능성)
+                    if (presetCount === 0 && charCount === 0) {
+                        console.warn('[CharacterPromptStore] Warning: No data after hydration - possible data loss')
+                    }
+                }
+            },
+            // 저장할 필드 명시
+            partialize: (state) => ({
+                characters: state.characters,
+                presets: state.presets,
+                groups: state.groups,
+                positionEnabled: state.positionEnabled,
+            }),
         }
     )
 )

@@ -63,13 +63,17 @@ export function ThreeColumnLayout({ children }: ThreeColumnLayoutProps) {
         }
     }, [])
 
-    // Calculate cached vs uncached vibes
-    const uncachedVibeCount = vibeImages.filter(v => !v.encodedVibe).length
-    const cachedVibeCount = vibeImages.length - uncachedVibeCount
+    // Calculate cached vs uncached vibes (only enabled ones)
+    const enabledVibes = vibeImages.filter(v => v.enabled !== false)
+    const uncachedVibeCount = enabledVibes.filter(v => !v.encodedVibe).length
+    const cachedVibeCount = enabledVibes.length - uncachedVibeCount
 
-    // Only calculate extra costs for uncached vibes
+    // Count only enabled character images
+    const enabledCharCount = characterImages.filter(c => c.enabled !== false).length
+
+    // Only calculate extra costs for enabled uncached vibes and enabled characters
     const cost = calculateExtraCost(
-        characterImages.length,
+        enabledCharCount,
         uncachedVibeCount
     )
 

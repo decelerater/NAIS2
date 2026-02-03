@@ -5,51 +5,270 @@ import { StateStorage } from 'zustand/middleware'
 
 const DB_NAME = 'nais2-db'
 const STORE_NAME = 'keyval'
+const DB_TIMEOUT_MS = 10000 // 10초 타임아웃
 
-const dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1)
-    request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-            db.createObjectStore(STORE_NAME)
+// IndexedDB 초기화 실패 추적
+let dbInitFailed = false
+let dbInitError: Error | null = null
+
+// 지연 초기화 - 모듈 로드 시점이 아닌 첫 사용 시점에 초기화
+let dbPromise: Promise<IDBDatabase> | null = null
+
+function getDb(): Promise<IDBDatabase> {
+    if (dbPromise) return dbPromise
+    
+    // 이전에 초기화 실패했으면 즉시 reject
+    if (dbInitFailed) {
+        return Promise.reject(dbInitError || new Error('IndexedDB initialization previously failed'))
+    }
+    
+    dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
+        // IndexedDB 지원 체크
+        if (typeof indexedDB === 'undefined') {
+            dbInitFailed = true
+            dbInitError = new Error('IndexedDB is not supported in this environment')
+            reject(dbInitError)
+            return
         }
+        
+        // 타임아웃 설정 - DB 열기가 무한 대기되는 것 방지
+        const timeoutId = setTimeout(() => {
+            dbInitFailed = true
+            dbInitError = new Error(`IndexedDB open timed out after ${DB_TIMEOUT_MS}ms`)
+            console.error('[IndexedDB]', dbInitError.message)
+            reject(dbInitError)
+        }, DB_TIMEOUT_MS)
+        
+        try {
+            const request = indexedDB.open(DB_NAME, 1)
+            
+            request.onupgradeneeded = (event) => {
+                try {
+                    const db = (event.target as IDBOpenDBRequest).result
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME)
+                    }
+                } catch (err) {
+                    console.error('[IndexedDB] onupgradeneeded error:', err)
+                }
+            }
+            
+            request.onsuccess = () => {
+                clearTimeout(timeoutId)
+                const db = request.result
+                
+                // DB 연결 끊김 감지
+                db.onclose = () => {
+                    console.warn('[IndexedDB] Database connection closed unexpectedly')
+                    dbPromise = null // 다음 요청 시 재연결 시도
+                }
+                
+                db.onerror = (event) => {
+                    console.error('[IndexedDB] Database error:', event)
+                }
+                
+                console.log('[IndexedDB] Database opened successfully')
+                resolve(db)
+            }
+            
+            request.onerror = () => {
+                clearTimeout(timeoutId)
+                dbInitFailed = true
+                dbInitError = request.error || new Error('Failed to open IndexedDB')
+                console.error('[IndexedDB] Open error:', dbInitError)
+                reject(dbInitError)
+            }
+            
+            request.onblocked = () => {
+                console.warn('[IndexedDB] Database blocked - another connection is open')
+            }
+        } catch (err) {
+            clearTimeout(timeoutId)
+            dbInitFailed = true
+            dbInitError = err instanceof Error ? err : new Error(String(err))
+            console.error('[IndexedDB] Unexpected error during open:', dbInitError)
+            reject(dbInitError)
+        }
+    })
+    
+    return dbPromise
+}
+
+// DB 초기화 상태 확인용 (마이그레이션 전 체크용)
+export async function ensureDbReady(): Promise<boolean> {
+    try {
+        await getDb()
+        return true
+    } catch (err) {
+        console.error('[IndexedDB] ensureDbReady failed:', err)
+        return false
     }
-    request.onsuccess = () => {
-        resolve(request.result)
-    }
-    request.onerror = () => reject(request.error)
-})
+}
+
+// DB 초기화 실패 여부 확인
+export function isDbInitFailed(): boolean {
+    return dbInitFailed
+}
+
+const OPERATION_TIMEOUT_MS = 5000 // 개별 작업 타임아웃
 
 export const indexedDBStorage: StateStorage = {
     getItem: async (name: string): Promise<string | null> => {
-        const db = await dbPromise
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readonly')
-            const store = transaction.objectStore(STORE_NAME)
-            const request = store.get(name)
-            request.onsuccess = () => resolve(request.result as string || null)
-            request.onerror = () => reject(request.error)
-        })
+        // DB 초기화 실패 시 null 반환 (데이터 손실 방지를 위해 에러 대신 null)
+        if (dbInitFailed) {
+            console.warn(`[IndexedDB] getItem(${name}): DB init failed, returning null`)
+            return null
+        }
+        
+        try {
+            const db = await getDb()
+            return new Promise((resolve, reject) => {
+                const timeoutId = setTimeout(() => {
+                    console.error(`[IndexedDB] getItem(${name}): Operation timed out`)
+                    reject(new Error(`getItem timed out for key: ${name}`))
+                }, OPERATION_TIMEOUT_MS)
+                
+                try {
+                    const transaction = db.transaction(STORE_NAME, 'readonly')
+                    
+                    transaction.onerror = () => {
+                        clearTimeout(timeoutId)
+                        console.error(`[IndexedDB] getItem(${name}): Transaction error`, transaction.error)
+                        reject(transaction.error)
+                    }
+                    
+                    transaction.onabort = () => {
+                        clearTimeout(timeoutId)
+                        console.error(`[IndexedDB] getItem(${name}): Transaction aborted`)
+                        reject(new Error('Transaction aborted'))
+                    }
+                    
+                    const store = transaction.objectStore(STORE_NAME)
+                    const request = store.get(name)
+                    
+                    request.onsuccess = () => {
+                        clearTimeout(timeoutId)
+                        resolve(request.result as string || null)
+                    }
+                    
+                    request.onerror = () => {
+                        clearTimeout(timeoutId)
+                        console.error(`[IndexedDB] getItem(${name}): Request error`, request.error)
+                        reject(request.error)
+                    }
+                } catch (err) {
+                    clearTimeout(timeoutId)
+                    throw err
+                }
+            })
+        } catch (err) {
+            console.error(`[IndexedDB] getItem(${name}): Failed`, err)
+            // 읽기 실패 시 null 반환 - Zustand이 기본값 사용하도록
+            return null
+        }
     },
+    
     setItem: async (name: string, value: string): Promise<void> => {
-        const db = await dbPromise
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readwrite')
-            const store = transaction.objectStore(STORE_NAME)
-            const request = store.put(value, name)
-            request.onsuccess = () => resolve()
-            request.onerror = () => reject(request.error)
-        })
+        // DB 초기화 실패 시 조용히 실패 (데이터는 메모리에만 유지)
+        if (dbInitFailed) {
+            console.warn(`[IndexedDB] setItem(${name}): DB init failed, skipping persist`)
+            return
+        }
+        
+        try {
+            const db = await getDb()
+            return new Promise((resolve, reject) => {
+                const timeoutId = setTimeout(() => {
+                    console.error(`[IndexedDB] setItem(${name}): Operation timed out`)
+                    reject(new Error(`setItem timed out for key: ${name}`))
+                }, OPERATION_TIMEOUT_MS)
+                
+                try {
+                    const transaction = db.transaction(STORE_NAME, 'readwrite')
+                    
+                    transaction.onerror = () => {
+                        clearTimeout(timeoutId)
+                        console.error(`[IndexedDB] setItem(${name}): Transaction error`, transaction.error)
+                        reject(transaction.error)
+                    }
+                    
+                    transaction.onabort = () => {
+                        clearTimeout(timeoutId)
+                        console.error(`[IndexedDB] setItem(${name}): Transaction aborted`)
+                        reject(new Error('Transaction aborted'))
+                    }
+                    
+                    transaction.oncomplete = () => {
+                        clearTimeout(timeoutId)
+                        resolve()
+                    }
+                    
+                    const store = transaction.objectStore(STORE_NAME)
+                    const request = store.put(value, name)
+                    
+                    request.onerror = () => {
+                        clearTimeout(timeoutId)
+                        console.error(`[IndexedDB] setItem(${name}): Request error`, request.error)
+                        reject(request.error)
+                    }
+                } catch (err) {
+                    clearTimeout(timeoutId)
+                    throw err
+                }
+            })
+        } catch (err) {
+            console.error(`[IndexedDB] setItem(${name}): Failed`, err)
+            // 쓰기 실패는 심각한 문제지만, 앱 크래시보다는 로그 남기고 계속
+        }
     },
+    
     removeItem: async (name: string): Promise<void> => {
-        const db = await dbPromise
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction(STORE_NAME, 'readwrite')
-            const store = transaction.objectStore(STORE_NAME)
-            const request = store.delete(name)
-            request.onsuccess = () => resolve()
-            request.onerror = () => reject(request.error)
-        })
+        if (dbInitFailed) {
+            console.warn(`[IndexedDB] removeItem(${name}): DB init failed, skipping`)
+            return
+        }
+        
+        try {
+            const db = await getDb()
+            return new Promise((resolve, reject) => {
+                const timeoutId = setTimeout(() => {
+                    console.error(`[IndexedDB] removeItem(${name}): Operation timed out`)
+                    reject(new Error(`removeItem timed out for key: ${name}`))
+                }, OPERATION_TIMEOUT_MS)
+                
+                try {
+                    const transaction = db.transaction(STORE_NAME, 'readwrite')
+                    
+                    transaction.onerror = () => {
+                        clearTimeout(timeoutId)
+                        reject(transaction.error)
+                    }
+                    
+                    transaction.onabort = () => {
+                        clearTimeout(timeoutId)
+                        reject(new Error('Transaction aborted'))
+                    }
+                    
+                    transaction.oncomplete = () => {
+                        clearTimeout(timeoutId)
+                        resolve()
+                    }
+                    
+                    const store = transaction.objectStore(STORE_NAME)
+                    const request = store.delete(name)
+                    
+                    request.onerror = () => {
+                        clearTimeout(timeoutId)
+                        reject(request.error)
+                    }
+                } catch (err) {
+                    clearTimeout(timeoutId)
+                    throw err
+                }
+            })
+        } catch (err) {
+            console.error(`[IndexedDB] removeItem(${name}): Failed`, err)
+        }
     },
 }
 
@@ -185,4 +404,106 @@ export async function migrateFromLocalStorage(keys: string[]): Promise<void> {
             // 실패해도 localStorage 데이터는 유지 - 다음 시작에 다시 시도
         }
     }
+}
+
+/**
+ * 전체 데이터 백업 (JSON export)
+ * 데이터 손실 방지를 위한 수동 백업 기능
+ */
+export async function exportAllData(): Promise<{ [key: string]: unknown }> {
+    const keys = [
+        'nais2-generation',
+        'nais2-character-store',
+        'nais2-character-prompts',
+        'nais2-presets',
+        'nais2-settings',
+        'nais2-scenes',
+        'nais2-shortcuts',
+        'nais2-theme',
+        'nais2-wildcards',
+        'nais2-layout',
+        'nais2-library',
+        'nais2-tools',
+    ]
+    
+    const backup: { [key: string]: unknown } = {
+        _exportedAt: new Date().toISOString(),
+        _version: '2.0',
+    }
+    
+    for (const key of keys) {
+        try {
+            const data = await indexedDBStorage.getItem(key)
+            if (data) {
+                backup[key] = JSON.parse(data)
+            }
+        } catch (err) {
+            console.error(`[Backup] Failed to export ${key}:`, err)
+        }
+    }
+    
+    console.log('[Backup] Export complete:', Object.keys(backup).length - 2, 'stores')
+    return backup
+}
+
+/**
+ * 백업 데이터 복원
+ * @param backup - exportAllData()로 생성된 백업 데이터
+ * @param overwrite - true면 기존 데이터 덮어쓰기, false면 빈 키만 복원
+ */
+export async function importAllData(backup: { [key: string]: unknown }, overwrite = false): Promise<{ success: string[], failed: string[] }> {
+    const result = { success: [] as string[], failed: [] as string[] }
+    
+    for (const [key, value] of Object.entries(backup)) {
+        if (key.startsWith('_')) continue // 메타데이터 스킵
+        
+        try {
+            if (!overwrite) {
+                const existing = await indexedDBStorage.getItem(key)
+                if (existing) {
+                    console.log(`[Restore] ${key}: Skipping (data exists)`)
+                    continue
+                }
+            }
+            
+            await indexedDBStorage.setItem(key, JSON.stringify(value))
+            result.success.push(key)
+            console.log(`[Restore] ${key}: Restored`)
+        } catch (err) {
+            console.error(`[Restore] ${key}: Failed`, err)
+            result.failed.push(key)
+        }
+    }
+    
+    console.log('[Restore] Complete:', result.success.length, 'success,', result.failed.length, 'failed')
+    return result
+}
+
+/**
+ * 특정 스토어 데이터 크기 확인 (디버깅용)
+ */
+export async function getStoreSizes(): Promise<{ [key: string]: number }> {
+    const keys = [
+        'nais2-generation',
+        'nais2-character-store',
+        'nais2-character-prompts',
+        'nais2-presets',
+        'nais2-settings',
+        'nais2-scenes',
+        'nais2-wildcards',
+        'nais2-library',
+    ]
+    
+    const sizes: { [key: string]: number } = {}
+    
+    for (const key of keys) {
+        try {
+            const data = await indexedDBStorage.getItem(key)
+            sizes[key] = data ? data.length : 0
+        } catch {
+            sizes[key] = -1 // 에러 표시
+        }
+    }
+    
+    return sizes
 }

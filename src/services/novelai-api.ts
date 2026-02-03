@@ -53,10 +53,15 @@ export interface GenerationParams {
     variety: boolean
     seed: number
 
-    // Character Reference
+    // Precise Reference (Director Tools) - 2026년 2월 업데이트
     charImages?: string[]
+    charStrength?: number[]      // Strength 값 (0~1)
+    charFidelity?: number[]      // Fidelity 값 (0~1) - API에서는 1-fidelity로 전송
+    charReferenceType?: ('character' | 'style' | 'character&style')[]  // 참조 타입
+    charCacheKeys?: (string | null)[]  // 캐시 키 (이미 서버에 캐시된 경우)
+
+    // Legacy (하위 호환용)
     charInfo?: number[]
-    charStrength?: number[]
 
     // Vibe Transfer
     vibeImages?: string[]
@@ -350,7 +355,7 @@ function processCharacterImage(imageBase64: string): Promise<string> {
 export async function generateImage(
     token: string,
     params: GenerationParams
-): Promise<{ success: boolean; imageData?: string; error?: string; encodedVibes?: string[] }> {
+): Promise<{ success: boolean; imageData?: string; error?: string; encodedVibes?: string[]; charCacheKeys?: string[] }> {
     if (!token) {
         return { success: false, error: 'API 토큰이 필요합니다' }
     }
@@ -379,13 +384,22 @@ export async function generateImage(
             }
         }
 
-        // Process Character Reference Images
+        // Process Character Reference Images (Precise Reference)
+        // 캐시 키가 있으면 이미지 처리 스킵, 없으면 처리 후 전송
         const processedCharImages: string[] = []
+        const charImagesThatNeedProcessing: number[] = []  // 처리가 필요한 이미지 인덱스
+        
         if (params.charImages && params.charImages.length > 0) {
-            for (const img of params.charImages) {
+            for (let i = 0; i < params.charImages.length; i++) {
+                // 캐시 키가 있으면 이미지 처리 스킵
+                if (params.charCacheKeys?.[i]) {
+                    processedCharImages.push('')  // placeholder - 캐시 사용 시 이미지 데이터 불필요
+                    continue
+                }
                 try {
-                    const processed = await processCharacterImage(img)
+                    const processed = await processCharacterImage(params.charImages[i])
                     processedCharImages.push(processed)
+                    charImagesThatNeedProcessing.push(i)
                 } catch (e) {
                     console.error('Character image processing error:', e)
                     return { success: false, error: `Character Processing Failed: ${e}` }
@@ -444,24 +458,35 @@ export async function generateImage(
             reference_information_extracted_multiple: params.vibeInfo || [],
             reference_strength_multiple: params.vibeStrength || [],
 
-            // Character Reference (Director tools)
-            // Based on official NovelAI API analysis:
-            // - information_extracted and strength_values are always 1.0
-            // - secondary_strength_values = 1 - Fidelity (INVERTED!)
-            // - Style Aware controls base_caption: "character&style" (ON) vs "character" (OFF)
-            director_reference_images: processedCharImages,
-            director_reference_information_extracted: (params.charInfo || []).map(() => 1.0),
-            director_reference_strength_values: (params.charInfo || []).map(() => 1.0),
-            // Fidelity is INVERTED: UI 0 = API 1, UI 1 = API 0
-            director_reference_secondary_strength_values: (params.charStrength || []).map(s => 1.0 - s),
-            // Style Aware: charInfo >= 0.5 = ON ("character&style"), < 0.5 = OFF ("character")
-            director_reference_descriptions: (params.charInfo || []).map(info => ({
-                caption: {
-                    base_caption: info >= 0.5 ? "character&style" : "character",
-                    char_captions: []
-                },
-                legacy_uc: false
-            })),
+            // Precise Reference (Director tools) - 2026년 2월 업데이트
+            // - information_extracted: 항상 1
+            // - strength_values: UI Strength 값 그대로
+            // - secondary_strength_values: 1 - Fidelity
+            // - descriptions: character / style / character&style
+            ...(processedCharImages.length > 0 ? {
+                // 캐시 키가 있는 이미지는 캐시 사용, 없으면 이미지 전송
+                ...(params.charCacheKeys?.some(k => k) ? {
+                    director_reference_images_cached: params.charCacheKeys!.map((key, i) => 
+                        key ? { cache_secret_key: key } : undefined
+                    ).filter(Boolean),
+                    // 캐시되지 않은 이미지만 전송
+                    ...(charImagesThatNeedProcessing.length > 0 ? {
+                        director_reference_images: charImagesThatNeedProcessing.map(i => processedCharImages[i])
+                    } : {})
+                } : {
+                    director_reference_images: processedCharImages
+                }),
+                director_reference_information_extracted: processedCharImages.map(() => 1),
+                director_reference_strength_values: params.charStrength || processedCharImages.map(() => 0.6),
+                director_reference_secondary_strength_values: (params.charFidelity || processedCharImages.map(() => 0.6)).map(f => 1 - f),
+                director_reference_descriptions: (params.charReferenceType || processedCharImages.map(() => 'character&style')).map(type => ({
+                    caption: {
+                        base_caption: type,
+                        char_captions: []
+                    },
+                    legacy_uc: false
+                }))
+            } : {}),
 
             // V4 prompt format (with comments removed)
             v4_prompt: {
@@ -525,18 +550,6 @@ export async function generateImage(
             apiParameters.normalize_reference_strength_multiple = true
         }
 
-        // Add character descriptions if character references exist
-        if (processedCharImages.length > 0) {
-            // @ts-ignore
-            apiParameters.director_reference_descriptions = processedCharImages.map(() => ({
-                caption: {
-                    base_caption: "character",
-                    char_captions: []
-                },
-                legacy_uc: false
-            }))
-        }
-
         // Determine action type based on params
         let action = 'generate'
         let requestModel = params.model
@@ -558,24 +571,15 @@ export async function generateImage(
 
                 const userStrength = params.strength ?? 0.7
 
-                // Fixed Strength for Inpainting Top-Level
-                // @ts-ignore
-                apiParameters.strength = 0.7
-
-                // Img2Img Nested Object with User Strength
-                // @ts-ignore
-                apiParameters.img2img = {
-                    strength: userStrength,
-                    color_correct: true // Often forced to true in reference impl
-                }
-
-                // Extra Inpainting Specific Strength Parameter
+                // Inpainting strength parameter - use user's value
+                // Based on NAIA2.0 reference: inpaintImg2ImgStrength = params.get('strength', 0.7)
                 // @ts-ignore
                 apiParameters.inpaintImg2ImgStrength = userStrength
 
-                // Noise is REMOVED for Infill in reference implementation
+                // Noise is kept for infill (not deleted)
+                // User can control noise via params.noise (default varies)
                 // @ts-ignore
-                delete apiParameters.noise
+                apiParameters.noise = params.noise ?? 0
 
                 // Mask Parameters - Convert to grayscale (NAI requires pure black/white mask)
                 // Get actual source image dimensions (not selected resolution!)
@@ -593,21 +597,11 @@ export async function generateImage(
                 const grayscaleMask = await convertMaskToGrayscale(params.mask, srcDimensions.width, srcDimensions.height)
                 // @ts-ignore
                 apiParameters.mask = grayscaleMask
-                // @ts-ignore
-                apiParameters.add_original_image = true
+                // @ts-ignore - infill uses add_original_image: false
+                apiParameters.add_original_image = false
 
-                // Inpainting model doesn't support director reference images - DELETE them entirely
-                // (NAI-Auto-Generator-V4 uses pop() to remove, not empty arrays)
-                // @ts-ignore
-                delete apiParameters.director_reference_images
-                // @ts-ignore
-                delete apiParameters.director_reference_information_extracted
-                // @ts-ignore
-                delete apiParameters.director_reference_strength_values
-                // @ts-ignore
-                delete apiParameters.director_reference_secondary_strength_values
-                // @ts-ignore
-                delete apiParameters.director_reference_descriptions
+                // Note: Inpainting now supports director reference images (Feb 2026 update)
+                // No need to delete director_reference_* parameters
 
             } else {
                 // --- REGULAR IMAGE TO IMAGE CONFIGURATION ---
@@ -758,13 +752,22 @@ export async function generateImageStream(
             }
         }
 
-        // Process Character Reference Images
+        // Process Character Reference Images (Precise Reference)
+        // 캐시 키가 있으면 이미지 처리 스킵, 없으면 처리 후 전송
         const processedCharImages: string[] = []
+        const charImagesThatNeedProcessingStream: number[] = []  // 처리가 필요한 이미지 인덱스
+        
         if (params.charImages && params.charImages.length > 0) {
-            for (const img of params.charImages) {
+            for (let i = 0; i < params.charImages.length; i++) {
+                // 캐시 키가 있으면 이미지 처리 스킵
+                if (params.charCacheKeys?.[i]) {
+                    processedCharImages.push('')  // placeholder - 캐시 사용 시 이미지 데이터 불필요
+                    continue
+                }
                 try {
-                    const processed = await processCharacterImage(img)
+                    const processed = await processCharacterImage(params.charImages[i])
                     processedCharImages.push(processed)
+                    charImagesThatNeedProcessingStream.push(i)
                 } catch (e) {
                     console.error('Character image processing error (Stream):', e)
                     return { success: false, error: `Character Processing Failed: ${e}` }
@@ -832,25 +835,6 @@ export async function generateImageStream(
             reference_information_extracted_multiple: params.vibeInfo || [],
             reference_strength_multiple: params.vibeStrength || [],
 
-            // Character Reference (Director tools)
-            // Based on official NovelAI API analysis:
-            // - information_extracted and strength_values are always 1.0
-            // - secondary_strength_values = 1 - Fidelity (INVERTED!)
-            // - Style Aware controls base_caption: "character&style" (ON) vs "character" (OFF)
-            director_reference_images: processedCharImages,
-            director_reference_information_extracted: (params.charInfo || []).map(() => 1.0),
-            director_reference_strength_values: (params.charInfo || []).map(() => 1.0),
-            // Fidelity is INVERTED: UI 0 = API 1, UI 1 = API 0
-            director_reference_secondary_strength_values: (params.charStrength || []).map(s => 1.0 - s),
-            // Style Aware: charInfo >= 0.5 = ON ("character&style"), < 0.5 = OFF ("character")
-            director_reference_descriptions: (params.charInfo || []).map(info => ({
-                caption: {
-                    base_caption: info >= 0.5 ? "character&style" : "character",
-                    char_captions: []
-                },
-                legacy_uc: false
-            })),
-
             // V4 prompt format initialization (with comments removed)
             v4_prompt: {
                 caption: {
@@ -910,11 +894,26 @@ export async function generateImageStream(
             apiParameters.normalize_reference_strength_multiple = true
         }
 
-        // Add character descriptions if character references exist
+        // Precise Reference (Director tools) - 2026년 2월 업데이트
         if (processedCharImages.length > 0) {
-            apiParameters.director_reference_descriptions = processedCharImages.map(() => ({
+            // 캐시 키가 있는 이미지는 캐시 사용, 없으면 이미지 전송
+            if (params.charCacheKeys?.some(k => k)) {
+                apiParameters.director_reference_images_cached = params.charCacheKeys!.map((key, i) => 
+                    key ? { cache_secret_key: key } : undefined
+                ).filter(Boolean)
+                // 캐시되지 않은 이미지만 전송
+                if (charImagesThatNeedProcessingStream.length > 0) {
+                    apiParameters.director_reference_images = charImagesThatNeedProcessingStream.map(i => processedCharImages[i])
+                }
+            } else {
+                apiParameters.director_reference_images = processedCharImages
+            }
+            apiParameters.director_reference_information_extracted = processedCharImages.map(() => 1)
+            apiParameters.director_reference_strength_values = params.charStrength || processedCharImages.map(() => 0.6)
+            apiParameters.director_reference_secondary_strength_values = (params.charFidelity || processedCharImages.map(() => 0.6)).map(f => 1 - f)
+            apiParameters.director_reference_descriptions = (params.charReferenceType || processedCharImages.map(() => 'character&style')).map(type => ({
                 caption: {
-                    base_caption: "character",
+                    base_caption: type,
                     char_captions: []
                 },
                 legacy_uc: false
@@ -940,14 +939,13 @@ export async function generateImageStream(
                 }
 
                 const userStrength = params.strength ?? 0.7
-                apiParameters.strength = 0.7 // Infill top level fixed
 
-                apiParameters.img2img = {
-                    strength: userStrength,
-                    color_correct: true
-                }
+                // Inpainting strength parameter - use user's value
+                // Based on NAIA2.0 reference: inpaintImg2ImgStrength = params.get('strength', 0.7)
                 apiParameters.inpaintImg2ImgStrength = userStrength
-                delete apiParameters.noise // Remove noise for infill
+
+                // Noise is kept for infill
+                apiParameters.noise = params.noise ?? 0
 
                 // Mask Logic
                 const getImageDimensions = async (base64: string): Promise<{ width: number; height: number }> => {
@@ -969,14 +967,11 @@ export async function generateImageStream(
                     return { success: false, error: 'Mask processing failed' }
                 }
 
-                apiParameters.add_original_image = true
+                // infill uses add_original_image: false
+                apiParameters.add_original_image = false
 
-                // Cleanup incompatible params for inpainting
-                delete apiParameters.director_reference_images
-                delete apiParameters.director_reference_information_extracted
-                delete apiParameters.director_reference_strength_values
-                delete apiParameters.director_reference_secondary_strength_values
-                delete apiParameters.director_reference_descriptions
+                // Note: Inpainting now supports director reference images (Feb 2026 update)
+                // No need to delete director_reference_* parameters
 
             } else {
                 // --- REGULAR IMAGE TO IMAGE CONFIGURATION ---
