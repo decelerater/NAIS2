@@ -35,14 +35,18 @@ interface CharacterState {
 import { createJSONStorage } from 'zustand/middleware'
 import { indexedDBStorage } from '@/lib/indexed-db'
 
+// MEMORY OPTIMIZATION: Limit reference images to prevent OOM
+const MAX_CHARACTER_IMAGES = 10
+const MAX_VIBE_IMAGES = 10
+
 export const useCharacterStore = create<CharacterState>()(
     persist(
         (set) => ({
             characterImages: [],
             vibeImages: [],
 
-            addCharacterImage: (base64) => set((state) => ({
-                characterImages: [
+            addCharacterImage: (base64) => set((state) => {
+                const newImages = [
                     ...state.characterImages,
                     {
                         id: Date.now().toString(),
@@ -54,7 +58,15 @@ export const useCharacterStore = create<CharacterState>()(
                         referenceType: 'character&style' as PreciseReferenceType
                     }
                 ]
-            })),
+                
+                // Limit total count - remove oldest when over limit
+                if (newImages.length > MAX_CHARACTER_IMAGES) {
+                    console.warn(`[CharacterStore] Trimming character images from ${newImages.length} to ${MAX_CHARACTER_IMAGES}`)
+                    return { characterImages: newImages.slice(-MAX_CHARACTER_IMAGES) }
+                }
+                
+                return { characterImages: newImages }
+            }),
 
             updateCharacterImage: (id, updates) => set((state) => ({
                 characterImages: state.characterImages.map(img =>
@@ -68,8 +80,8 @@ export const useCharacterStore = create<CharacterState>()(
 
             addVibeImage: (base64, encodedVibe, informationExtracted, strength) => {
                 console.log('[CharacterStore] addVibeImage called', { encodedVibe: !!encodedVibe })
-                set((state) => ({
-                    vibeImages: [
+                set((state) => {
+                    const newImages = [
                         ...state.vibeImages,
                         {
                             id: Date.now().toString(),
@@ -82,7 +94,15 @@ export const useCharacterStore = create<CharacterState>()(
                             referenceType: 'character&style' as PreciseReferenceType
                         }
                     ]
-                }))
+                    
+                    // Limit total count - remove oldest when over limit
+                    if (newImages.length > MAX_VIBE_IMAGES) {
+                        console.warn(`[CharacterStore] Trimming vibe images from ${newImages.length} to ${MAX_VIBE_IMAGES}`)
+                        return { vibeImages: newImages.slice(-MAX_VIBE_IMAGES) }
+                    }
+                    
+                    return { vibeImages: newImages }
+                })
             },
 
             updateVibeImage: (id, updates) => set((state) => ({

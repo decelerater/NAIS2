@@ -243,14 +243,22 @@ export function HistoryPanel() {
 
     const handleImageLoadComplete = useCallback((path: string, data: string) => {
         setImageThumbnails(prev => {
-            if (prev[path]) return prev
+            // Skip if already cached with same data
+            if (prev[path] === data) return prev
+            
             const keys = Object.keys(prev)
             // If cache is full, remove oldest entries (first in object)
             if (keys.length >= MAX_THUMBNAIL_CACHE) {
                 const keysToRemove = keys.slice(0, keys.length - MAX_THUMBNAIL_CACHE + 1)
-                const newCache = { ...prev }
-                keysToRemove.forEach(k => delete newCache[k])
-                return { ...newCache, [path]: data }
+                const newCache: Record<string, string> = {}
+                // Only keep entries not in keysToRemove
+                for (const k of keys) {
+                    if (!keysToRemove.includes(k)) {
+                        newCache[k] = prev[k]
+                    }
+                }
+                newCache[path] = data
+                return newCache
             }
             return { ...prev, [path]: data }
         })

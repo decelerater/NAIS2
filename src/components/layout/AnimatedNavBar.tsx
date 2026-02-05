@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { LucideIcon } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
 interface NavItem {
     path: string
@@ -17,6 +18,15 @@ interface AnimatedNavBarProps {
 export function AnimatedNavBar({ items }: AnimatedNavBarProps) {
     const { t } = useTranslation()
     const location = useLocation()
+    const [isCompact, setIsCompact] = useState(window.innerWidth < 1382)
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsCompact(window.innerWidth < 1382)
+        }
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [])
 
     return (
         <nav className="flex items-center gap-1 p-1">
@@ -26,8 +36,10 @@ export function AnimatedNavBar({ items }: AnimatedNavBarProps) {
                     <NavLink
                         key={item.path}
                         to={item.path}
+                        title={isCompact ? t(item.labelKey) : undefined}
                         className={cn(
-                            "relative px-4 py-2 rounded-full text-sm font-medium transition-colors z-0",
+                            "relative rounded-full text-sm font-medium transition-colors z-0",
+                            isCompact ? "p-2" : "px-4 py-2",
                             isActive
                                 ? "text-foreground"
                                 : "text-muted-foreground hover:text-foreground/80"
@@ -42,7 +54,7 @@ export function AnimatedNavBar({ items }: AnimatedNavBarProps) {
                         )}
                         <span className="flex items-center gap-2 relative z-10">
                             <item.icon className="h-4 w-4" />
-                            <span>{t(item.labelKey)}</span>
+                            {!isCompact && <span>{t(item.labelKey)}</span>}
                         </span>
                     </NavLink>
                 )

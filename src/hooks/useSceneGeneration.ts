@@ -49,17 +49,21 @@ export function useSceneGeneration() {
             
             // Session check: If session changed, this processQueue is stale
             if (sessionId !== useSceneStore.getState().generationSessionId) {
+                isProcessing = false
                 return
             }
             
             isProcessing = true
 
-            if (!isGenerating) {
-                // If scene generation stopped, ensure global mode is cleared if it was 'scene'
+            // Check if cancelled - if so, stop generation after current API call completes
+            const sceneState = useSceneStore.getState()
+            if (sceneState.isCancelling || !isGenerating) {
+                // If scene generation stopped or cancelled, ensure global mode is cleared
                 if (generationStore.generatingMode === 'scene') {
                     generationStore.setGeneratingMode(null)
                 }
-                isProcessing = false  // CRITICAL: Reset flag on early return
+                setIsGenerating(false)  // This will also reset isCancelling
+                isProcessing = false
                 return
             }
 
@@ -151,7 +155,11 @@ export function useSceneGeneration() {
                 )
 
                 // Determine Seed (Randomize if not locked)
-                const finalSeed = genState.seedLocked ? genState.seed : Math.floor(Math.random() * 4294967295)
+                // If seed is 0, treat it as "random seed" request
+                let finalSeed = genState.seedLocked ? genState.seed : Math.floor(Math.random() * 4294967295)
+                if (finalSeed === 0) {
+                    finalSeed = Math.floor(Math.random() * 4294967295)
+                }
 
                 // Helper function to round to nearest multiple of 64 (NovelAI requirement)
                 const roundTo64 = (value: number): number => Math.round(value / 64) * 64
@@ -173,6 +181,8 @@ export function useSceneGeneration() {
                         finalWidth = roundTo64(img.width)
                         finalHeight = roundTo64(img.height)
                         console.log(`[SceneGeneration] Using source image dimensions: ${img.width}x${img.height} → ${finalWidth}x${finalHeight}`)
+                        // MEMORY: Clear image reference
+                        img.src = ''
                     } catch (e) {
                         console.warn('[SceneGeneration] Failed to get source image dimensions, using scene/global resolution')
                     }

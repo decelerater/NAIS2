@@ -75,7 +75,9 @@ interface SceneState {
 
     // Generation Status
     isGenerating: boolean
+    isCancelling: boolean  // True when cancel requested but API call still in progress
     setIsGenerating: (isGenerating: boolean) => void
+    cancelSceneGeneration: () => void  // Request cancel (keeps button locked until API completes)
     generationSessionId: number  // Incremented on each new generation session to invalidate old ones
     startNewGenerationSession: () => number  // Returns new session ID
 
@@ -427,16 +429,36 @@ export const useSceneStore = create<SceneState>()(
                     timestamp: Date.now(),
                     isFavorite: false,
                 }
+                
+                // MEMORY OPTIMIZATION: Limit images per scene to prevent OOM
+                const MAX_IMAGES_PER_SCENE = 100
+                
                 set(state => ({
                     presets: state.presets.map(p =>
                         p.id === presetId
                             ? {
                                 ...p,
-                                scenes: p.scenes.map(s =>
-                                    s.id === sceneId
-                                        ? { ...s, images: [newImage, ...s.images] }
-                                        : s
-                                ),
+                                scenes: p.scenes.map(s => {
+                                    if (s.id !== sceneId) return s
+                                    
+                                    // Add new image and limit total count
+                                    let updatedImages = [newImage, ...s.images]
+                                    
+                                    // If over limit, remove oldest non-favorites
+                                    if (updatedImages.length > MAX_IMAGES_PER_SCENE) {
+                                        // Separate favorites and non-favorites
+                                        const favorites = updatedImages.filter(img => img.isFavorite)
+                                        const nonFavorites = updatedImages.filter(img => !img.isFavorite)
+                                        
+                                        // Keep all favorites + newest non-favorites up to limit
+                                        const keepCount = Math.max(0, MAX_IMAGES_PER_SCENE - favorites.length)
+                                        updatedImages = [...favorites, ...nonFavorites.slice(0, keepCount)]
+                                        
+                                        console.warn(`[SceneStore] Scene ${s.name}: Trimmed to ${updatedImages.length} images (limit: ${MAX_IMAGES_PER_SCENE})`)
+                                    }
+                                    
+                                    return { ...s, images: updatedImages }
+                                }),
                             }
                             : p
                     ),
@@ -593,18 +615,24 @@ export const useSceneStore = create<SceneState>()(
             },
 
             isGenerating: false,
+            isCancelling: false,
             setIsGenerating: (isGenerating) => {
                 // When stopping generation, increment session ID to invalidate any in-progress operations
                 if (!isGenerating) {
-                    set({ isGenerating: false, generationSessionId: Date.now() })
+                    set({ isGenerating: false, isCancelling: false, generationSessionId: Date.now() })
                 } else {
-                    set({ isGenerating: true })
+                    set({ isGenerating: true, isCancelling: false })
                 }
+            },
+            cancelSceneGeneration: () => {
+                // Request cancel but keep isGenerating=true until API completes
+                // This prevents 429 errors from rapid cancel/restart
+                set({ isCancelling: true, generationSessionId: Date.now() })
             },
             generationSessionId: 0,
             startNewGenerationSession: () => {
                 const newSessionId = Date.now()
-                set({ generationSessionId: newSessionId, isGenerating: true })
+                set({ generationSessionId: newSessionId, isGenerating: true, isCancelling: false })
                 return newSessionId
             },
 
@@ -935,16 +963,32 @@ export const useSceneStore = create<SceneState>()(
         {
             name: 'nais2-scenes',
             storage: createJSONStorage(() => indexedDBStorage),
-            partialize: (state) => ({
-                // Exclude queueCount from persistence for faster UI updates
-                presets: state.presets.map(p => ({
-                    ...p,
-                    scenes: p.scenes.map(s => ({ ...s, queueCount: 0 }))
-                })),
-                activePresetId: state.activePresetId,
-                gridColumns: state.gridColumns,
-                thumbnailLayout: state.thumbnailLayout,
-            }),
+            partialize: (state) => {
+                // MEMORY OPTIMIZATION: Limit images per scene during persistence
+                const MAX_IMAGES_PERSIST = 50 // 저장 시에는 더 적게
+                
+                return {
+                    // Exclude queueCount from persistence for faster UI updates
+                    presets: state.presets.map(p => ({
+                        ...p,
+                        scenes: p.scenes.map(s => ({
+                            ...s,
+                            queueCount: 0,
+                            // Limit stored images - keep favorites first, then newest
+                            images: (() => {
+                                if (s.images.length <= MAX_IMAGES_PERSIST) return s.images
+                                const favorites = s.images.filter(img => img.isFavorite)
+                                const nonFavorites = s.images.filter(img => !img.isFavorite)
+                                const keepCount = Math.max(0, MAX_IMAGES_PERSIST - favorites.length)
+                                return [...favorites, ...nonFavorites.slice(0, keepCount)]
+                            })()
+                        }))
+                    })),
+                    activePresetId: state.activePresetId,
+                    gridColumns: state.gridColumns,
+                    thumbnailLayout: state.thumbnailLayout,
+                }
+            },
             onRehydrateStorage: () => (state, error) => {
                 if (error) {
                     console.error('[SceneStore] Hydration failed:', error)
@@ -955,7 +999,14 @@ export const useSceneStore = create<SceneState>()(
                     // 복원 로그
                     const presetCount = state.presets?.length || 0
                     const totalScenes = state.presets?.reduce((sum, p) => sum + (p.scenes?.length || 0), 0) || 0
-                    console.log(`[SceneStore] Hydrated: ${presetCount} presets, ${totalScenes} total scenes`)
+                    const totalImages = state.presets?.reduce((sum, p) => 
+                        sum + p.scenes?.reduce((sSum, s) => sSum + (s.images?.length || 0), 0) || 0, 0) || 0
+                    console.log(`[SceneStore] Hydrated: ${presetCount} presets, ${totalScenes} scenes, ${totalImages} images`)
+                    
+                    // MEMORY WARNING: Log if too many images
+                    if (totalImages > 500) {
+                        console.warn(`[SceneStore] Warning: ${totalImages} images loaded - consider clearing old images`)
+                    }
                     
                     // 기본 프리셋 보장
                     if (!state.presets.find(p => p.id === DEFAULT_PRESET_ID)) {

@@ -73,7 +73,8 @@ export function PromptPanel() {
     const activePresetId = useSceneStore(state => state.activePresetId)
     const getTotalQueueCount = useSceneStore(state => state.getTotalQueueCount)
     const sceneIsGenerating = useSceneStore(state => state.isGenerating)
-    const setSceneIsGenerating = useSceneStore(state => state.setIsGenerating)
+    const sceneIsCancelling = useSceneStore(state => state.isCancelling)
+    const cancelSceneGeneration = useSceneStore(state => state.cancelSceneGeneration)
     const startNewGenerationSession = useSceneStore(state => state.startNewGenerationSession)
     const completedCount = useSceneStore(state => state.completedCount)
     const totalQueuedCount = useSceneStore(state => state.totalQueuedCount)
@@ -89,6 +90,7 @@ export function PromptPanel() {
     const seedLocked = useGenerationStore(state => state.seedLocked)
     const selectedResolution = useGenerationStore(state => state.selectedResolution)
     const isGenerating = useGenerationStore(state => state.isGenerating)
+    const isCancelled = useGenerationStore(state => state.isCancelled)
     const model = useGenerationStore(state => state.model)
     const steps = useGenerationStore(state => state.steps)
     const cfgScale = useGenerationStore(state => state.cfgScale)
@@ -189,8 +191,8 @@ export function PromptPanel() {
 
         if (isSceneMode) {
             // Toggle scene generation: start new session or cancel
-            if (sceneIsGenerating) {
-                setSceneIsGenerating(false)  // Cancel - just set to false
+            if (sceneIsGenerating || sceneIsCancelling) {
+                cancelSceneGeneration()  // Cancel - invalidates session but keeps button locked
             } else {
                 startNewGenerationSession()  // Start - creates new session ID
             }
@@ -202,7 +204,7 @@ export function PromptPanel() {
         } else {
             generate()
         }
-    }, [isConflict, isSceneMode, sceneIsGenerating, setSceneIsGenerating, startNewGenerationSession, isGenerating, cancelGeneration, generate])
+    }, [isConflict, isSceneMode, sceneIsGenerating, sceneIsCancelling, cancelSceneGeneration, startNewGenerationSession, isGenerating, cancelGeneration, generate])
 
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden p-2">
@@ -649,7 +651,7 @@ export function PromptPanel() {
                 {/* Generate Button + Counter */}
                 <div className="flex gap-2">
                     <Button
-                        variant={(isGenerating || (isSceneMode && sceneIsGenerating)) ? "destructive" : "generate"}
+                        variant={(isGenerating || (isSceneMode && (sceneIsGenerating || sceneIsCancelling))) ? "destructive" : "generate"}
                         size="lg"
                         className={cn(
                             "flex-1 h-12 rounded-xl text-base font-semibold shadow-lg transition-all duration-200",
@@ -657,12 +659,19 @@ export function PromptPanel() {
                         )}
                         onClick={handleGenerateOrCancel}
                         disabled={
-                            (isSceneMode && sceneQueueCount === 0 && !sceneIsGenerating) ||
-                            isConflict
+                            (isSceneMode && sceneQueueCount === 0 && !sceneIsGenerating && !sceneIsCancelling) ||
+                            isConflict ||
+                            sceneIsCancelling ||  // Disable while waiting for API to complete after cancel (Scene Mode)
+                            (isGenerating && isCancelled)  // Disable while waiting for API to complete after cancel (Main Mode)
                         }
                     >
                         {isSceneMode ? (
-                            sceneIsGenerating ? (
+                            sceneIsCancelling ? (
+                                <>
+                                    <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                    {t('common.cancelling', '취소 중...')}
+                                </>
+                            ) : sceneIsGenerating ? (
                                 <>
                                     <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
                                     {t('common.cancel', '취소')} {totalQueuedCount > 0 && `(${completedCount + 1}/${totalQueuedCount})`}
@@ -674,7 +683,12 @@ export function PromptPanel() {
                                 </>
                             )
                         ) : (
-                            isGenerating ? (
+                            isGenerating && isCancelled ? (
+                                <>
+                                    <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                    {t('common.cancelling', '취소 중...')}
+                                </>
+                            ) : isGenerating ? (
                                 <>
                                     <div className="mr-2 h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
                                     {batchCount > 1

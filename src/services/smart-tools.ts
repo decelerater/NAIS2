@@ -322,7 +322,12 @@ class SmartToolsService {
             img.src = imageBase64
         })
 
-        const result = await upscaleImage(token, imageBase64, img.width, img.height)
+        const width = img.width
+        const height = img.height
+        // MEMORY: Clear image reference after getting dimensions
+        img.src = ''
+
+        const result = await upscaleImage(token, imageBase64, width, height)
 
         if (!result.success || !result.imageData) {
             throw new Error(result.error || 'Upscale failed')

@@ -17,8 +17,9 @@ const createThumbnail = (base64Image: string, maxSize = 256): Promise<string> =>
     return new Promise((resolve) => {
         const img = new Image()
         img.onload = () => {
+            let canvas: HTMLCanvasElement | null = null
             try {
-                const canvas = document.createElement('canvas')
+                canvas = document.createElement('canvas')
                 const ctx = canvas.getContext('2d')
 
                 if (!ctx) {
@@ -50,9 +51,18 @@ const createThumbnail = (base64Image: string, maxSize = 256): Promise<string> =>
                 resolve(thumbnail)
             } catch {
                 resolve(base64Image) // Fallback to original
+            } finally {
+                // CRITICAL: Release canvas memory to prevent OOM
+                if (canvas) {
+                    canvas.width = 0
+                    canvas.height = 0
+                }
+                // Help GC by clearing image reference
+                img.src = ''
             }
         }
         img.onerror = () => {
+            img.src = '' // Clear on error too
             resolve(base64Image) // Fallback to original
         }
         img.src = base64Image
@@ -137,6 +147,9 @@ interface GenerationState {
 
     // AbortController for cancellation
     abortController: AbortController | null
+
+    // Generation session ID (to handle race conditions on cancel/restart)
+    generationSessionId: number
 
     // Streaming progress (0-100)
     streamProgress: number
@@ -254,6 +267,7 @@ export const useGenerationStore = create<GenerationState>()(
             previewImage: null,
             history: [],
             abortController: null,
+            generationSessionId: 0,
             streamProgress: 0,
 
             // Actions
@@ -317,10 +331,11 @@ export const useGenerationStore = create<GenerationState>()(
                 }
                 // Generate new seed if not locked (same as successful generation)
                 const newSeed = seedLocked ? undefined : Math.floor(Math.random() * 4294967295)
+                // Keep isGenerating=true until current request completes (prevents 429 errors)
+                // The finally block in generate() will set isGenerating=false
                 set({ 
                     isCancelled: true, 
-                    isGenerating: false, 
-                    generatingMode: null, 
+                    // isGenerating stays true - button remains locked until API response arrives
                     currentBatch: 0,
                     ...(newSeed !== undefined && { seed: newSeed })
                 })
@@ -360,20 +375,23 @@ export const useGenerationStore = create<GenerationState>()(
                     return
                 }
 
-                // Create new AbortController
+                // Create new AbortController and session ID
                 const abortController = new AbortController()
+                const sessionId = Date.now()
                 set({
                     isGenerating: true,
                     generatingMode: 'main',
                     isCancelled: false,
                     abortController,
+                    generationSessionId: sessionId,
                     estimatedTime: lastGenerationTime ? lastGenerationTime * batchCount : null
                 })
 
                 try {
                     for (let i = 0; i < batchCount; i++) {
-                        // Check if cancelled
-                        if (get().isCancelled) {
+                        // Check if cancelled or session changed (race condition protection)
+                        if (get().isCancelled || get().generationSessionId !== sessionId) {
+                            console.log('[Generate] Session invalidated, stopping batch loop')
                             break
                         }
 
@@ -399,7 +417,11 @@ export const useGenerationStore = create<GenerationState>()(
                         finalPrompt = await processWildcards(finalPrompt)
 
                         // Get current seed (may be different for each batch)
-                        const currentSeed = get().seedLocked ? seed : (i === 0 ? seed : Math.floor(Math.random() * 4294967295))
+                        // If seed is 0, treat it as "random seed" request
+                        let currentSeed = get().seedLocked ? seed : (i === 0 ? seed : Math.floor(Math.random() * 4294967295))
+                        if (currentSeed === 0) {
+                            currentSeed = Math.floor(Math.random() * 4294967295)
+                        }
 
                         if (!get().seedLocked && i > 0) {
                             set({ seed: currentSeed })
@@ -449,6 +471,8 @@ export const useGenerationStore = create<GenerationState>()(
                                 finalWidth = roundTo64(img.width)
                                 finalHeight = roundTo64(img.height)
                                 console.log(`[Generate] Using source image dimensions: ${img.width}x${img.height} → ${finalWidth}x${finalHeight}`)
+                                // MEMORY: Clear image reference
+                                img.src = ''
                             } catch (e) {
                                 console.warn('[Generate] Failed to get source image dimensions, using global resolution')
                             }
@@ -495,6 +519,10 @@ export const useGenerationStore = create<GenerationState>()(
 
                             // Image format (PNG or WebP)
                             imageFormat,
+
+                            // NAI UI options (Quality Tags & UC Preset)
+                            qualityToggle: get().qualityToggle,
+                            ucPreset: get().ucPreset,
                         }
 
                         // Reset progress
@@ -522,8 +550,9 @@ export const useGenerationStore = create<GenerationState>()(
                             result = await generateImage(token, generationParams)
                         }
 
-                        // Check if cancelled after API call
-                        if (get().isCancelled) {
+                        // Check if cancelled or session changed after API call
+                        if (get().isCancelled || get().generationSessionId !== sessionId) {
+                            console.log('[Generate] Session invalidated after API call, discarding result')
                             break
                         }
 
@@ -725,9 +754,8 @@ export const useGenerationStore = create<GenerationState>()(
                 batchCount: state.batchCount,
                 // Timing (for estimated time)
                 lastGenerationTime: state.lastGenerationTime,
-                // I2I & Inpainting state
-                sourceImage: state.sourceImage,
-                mask: state.mask,
+                // I2I & Inpainting state - DO NOT persist sourceImage/mask (large Base64 data, 1MB+ each)
+                // Only persist lightweight settings
                 i2iMode: state.i2iMode,
                 strength: state.strength,
                 noise: state.noise,

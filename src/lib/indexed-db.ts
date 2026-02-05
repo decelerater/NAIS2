@@ -428,7 +428,7 @@ export async function exportAllData(): Promise<{ [key: string]: unknown }> {
     
     const backup: { [key: string]: unknown } = {
         _exportedAt: new Date().toISOString(),
-        _version: '2.0',
+        _version: '2.1',  // Version bump for wildcard-content support
     }
     
     for (const key of keys) {
@@ -442,8 +442,101 @@ export async function exportAllData(): Promise<{ [key: string]: unknown }> {
         }
     }
     
+    // Export wildcard-content from separate IndexedDB database
+    try {
+        const wildcardContent = await exportWildcardContent()
+        if (Object.keys(wildcardContent).length > 0) {
+            backup['nais2-wildcard-content'] = wildcardContent
+            console.log('[Backup] Wildcard content exported:', Object.keys(wildcardContent).length, 'files')
+        }
+    } catch (err) {
+        console.error('[Backup] Failed to export wildcard content:', err)
+    }
+    
     console.log('[Backup] Export complete:', Object.keys(backup).length - 2, 'stores')
     return backup
+}
+
+/**
+ * Export all wildcard content from separate IndexedDB
+ */
+async function exportWildcardContent(): Promise<{ [id: string]: string[] }> {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('nais2-wildcard-content', 1)
+        
+        request.onerror = () => reject(request.error)
+        
+        request.onsuccess = () => {
+            const db = request.result
+            if (!db.objectStoreNames.contains('contents')) {
+                resolve({})
+                return
+            }
+            
+            const transaction = db.transaction('contents', 'readonly')
+            const store = transaction.objectStore('contents')
+            const getAllRequest = store.getAll()
+            const getAllKeysRequest = store.getAllKeys()
+            
+            const result: { [id: string]: string[] } = {}
+            
+            getAllKeysRequest.onsuccess = () => {
+                getAllRequest.onsuccess = () => {
+                    const keys = getAllKeysRequest.result as string[]
+                    const values = getAllRequest.result as string[][]
+                    
+                    for (let i = 0; i < keys.length; i++) {
+                        result[keys[i]] = values[i]
+                    }
+                    
+                    resolve(result)
+                }
+            }
+            
+            transaction.onerror = () => reject(transaction.error)
+        }
+        
+        request.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result
+            if (!db.objectStoreNames.contains('contents')) {
+                db.createObjectStore('contents')
+            }
+        }
+    })
+}
+
+/**
+ * Import wildcard content to separate IndexedDB
+ */
+async function importWildcardContent(content: { [id: string]: string[] }): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('nais2-wildcard-content', 1)
+        
+        request.onerror = () => reject(request.error)
+        
+        request.onsuccess = () => {
+            const db = request.result
+            const transaction = db.transaction('contents', 'readwrite')
+            const store = transaction.objectStore('contents')
+            
+            for (const [id, lines] of Object.entries(content)) {
+                store.put(lines, id)
+            }
+            
+            transaction.oncomplete = () => {
+                console.log('[Restore] Wildcard content restored:', Object.keys(content).length, 'files')
+                resolve()
+            }
+            transaction.onerror = () => reject(transaction.error)
+        }
+        
+        request.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result
+            if (!db.objectStoreNames.contains('contents')) {
+                db.createObjectStore('contents')
+            }
+        }
+    })
 }
 
 /**
@@ -456,6 +549,18 @@ export async function importAllData(backup: { [key: string]: unknown }, overwrit
     
     for (const [key, value] of Object.entries(backup)) {
         if (key.startsWith('_')) continue // 메타데이터 스킵
+        
+        // Handle wildcard-content separately (stored in separate IndexedDB)
+        if (key === 'nais2-wildcard-content') {
+            try {
+                await importWildcardContent(value as { [id: string]: string[] })
+                result.success.push(key)
+            } catch (err) {
+                console.error(`[Restore] ${key}: Failed`, err)
+                result.failed.push(key)
+            }
+            continue
+        }
         
         try {
             if (!overwrite) {
