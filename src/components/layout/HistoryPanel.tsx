@@ -264,8 +264,9 @@ export function HistoryPanel() {
         })
     }, [])
 
-    // Add new image instantly to history (no compression - use original directly)
-    const addNewImage = useCallback((imagePath: string, imageData: string) => {
+    // Add new image instantly to history
+    // Memory optimization: Use convertFileSrc for file-based images, only cache Base64 for temporary (memory://) images
+    const addNewImage = useCallback((imagePath: string, imageData?: string) => {
         const timestamp = Date.now()
         const isTemporary = imagePath.startsWith('memory://')
         const name = imagePath.split(/[/\\]/).pop() || `NAIS_${timestamp}.png`
@@ -281,7 +282,7 @@ export function HistoryPanel() {
             isTemporary
         }
 
-        // Instantly add to list with original data
+        // Instantly add to list
         setSavedImages(prev => {
             let next = [newImage, ...prev]
 
@@ -297,16 +298,21 @@ export function HistoryPanel() {
             }
             return next.slice(0, 50)
         })
-        // Apply same cache limit for instant additions
+
+        // Memory optimization: Only cache Base64 for temporary images, use convertFileSrc URL for files
+        const cacheData = isTemporary && imageData 
+            ? imageData 
+            : convertFileSrc(imagePath)
+        
         setImageThumbnails(prev => {
             const keys = Object.keys(prev)
             if (keys.length >= MAX_THUMBNAIL_CACHE) {
                 const keysToRemove = keys.slice(0, keys.length - MAX_THUMBNAIL_CACHE + 1)
                 const newCache = { ...prev }
                 keysToRemove.forEach(k => delete newCache[k])
-                return { ...newCache, [imagePath]: imageData }
+                return { ...newCache, [imagePath]: cacheData }
             }
-            return { ...prev, [imagePath]: imageData }
+            return { ...prev, [imagePath]: cacheData }
         })
     }, [])
 
@@ -514,7 +520,7 @@ export function HistoryPanel() {
 
     // Listen for instant image updates from generation
     useEffect(() => {
-        const handler = (e: CustomEvent<{ path: string; data: string }>) => {
+        const handler = (e: CustomEvent<{ path: string; data?: string }>) => {
             const { path, data } = e.detail
             addNewImage(path, data)
         }

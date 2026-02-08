@@ -406,11 +406,19 @@ export async function migrateFromLocalStorage(keys: string[]): Promise<void> {
     }
 }
 
+export interface ExportOptions {
+    /** If true, excludes large image data (base64) from character-store and generation history thumbnails */
+    excludeImages?: boolean
+}
+
 /**
  * 전체 데이터 백업 (JSON export)
  * 데이터 손실 방지를 위한 수동 백업 기능
+ * @param options - Export options
  */
-export async function exportAllData(): Promise<{ [key: string]: unknown }> {
+export async function exportAllData(options: ExportOptions = {}): Promise<{ [key: string]: unknown }> {
+    const { excludeImages = false } = options
+    
     const keys = [
         'nais2-generation',
         'nais2-character-store',
@@ -428,14 +436,22 @@ export async function exportAllData(): Promise<{ [key: string]: unknown }> {
     
     const backup: { [key: string]: unknown } = {
         _exportedAt: new Date().toISOString(),
-        _version: '2.1',  // Version bump for wildcard-content support
+        _version: '2.2',  // Version bump for excludeImages support
+        _excludedImages: excludeImages,
     }
     
     for (const key of keys) {
         try {
             const data = await indexedDBStorage.getItem(key)
             if (data) {
-                backup[key] = JSON.parse(data)
+                let parsed = JSON.parse(data)
+                
+                // Filter out large image data if excludeImages is enabled
+                if (excludeImages) {
+                    parsed = filterLargeImageData(key, parsed)
+                }
+                
+                backup[key] = parsed
             }
         } catch (err) {
             console.error(`[Backup] Failed to export ${key}:`, err)
@@ -453,8 +469,72 @@ export async function exportAllData(): Promise<{ [key: string]: unknown }> {
         console.error('[Backup] Failed to export wildcard content:', err)
     }
     
-    console.log('[Backup] Export complete:', Object.keys(backup).length - 2, 'stores')
+    console.log('[Backup] Export complete:', Object.keys(backup).length - 3, 'stores', excludeImages ? '(images excluded)' : '')
     return backup
+}
+
+/**
+ * Filter out large base64 image data from store data
+ * Preserves file paths and metadata, only removes embedded base64 images
+ */
+function filterLargeImageData(key: string, data: unknown): unknown {
+    if (!data || typeof data !== 'object') return data
+    
+    const obj = data as Record<string, unknown>
+    
+    // Handle Zustand persist wrapper structure: { state: {...}, version: number }
+    if ('state' in obj && 'version' in obj) {
+        return {
+            ...obj,
+            state: filterLargeImageData(key, obj.state)
+        }
+    }
+    
+    switch (key) {
+        case 'nais2-character-store':
+            // Filter characterImages and vibeImages base64 data
+            return {
+                ...obj,
+                characterImages: Array.isArray(obj.characterImages) 
+                    ? obj.characterImages.map((img: Record<string, unknown>) => ({
+                        ...img,
+                        base64: img.base64 && typeof img.base64 === 'string' && img.base64.startsWith('data:') 
+                            ? '[IMAGE_EXCLUDED]' 
+                            : img.base64,
+                        encodedVibe: undefined  // Large encoded vibe data
+                    }))
+                    : obj.characterImages,
+                vibeImages: Array.isArray(obj.vibeImages)
+                    ? obj.vibeImages.map((img: Record<string, unknown>) => ({
+                        ...img,
+                        base64: img.base64 && typeof img.base64 === 'string' && img.base64.startsWith('data:')
+                            ? '[IMAGE_EXCLUDED]'
+                            : img.base64,
+                        encodedVibe: undefined  // Large encoded vibe data
+                    }))
+                    : obj.vibeImages,
+            }
+            
+        case 'nais2-generation':
+            // Filter history thumbnails and source images
+            return {
+                ...obj,
+                history: Array.isArray(obj.history)
+                    ? obj.history.map((item: Record<string, unknown>) => ({
+                        ...item,
+                        thumbnail: item.thumbnail && typeof item.thumbnail === 'string' && item.thumbnail.startsWith('data:')
+                            ? '[THUMBNAIL_EXCLUDED]'
+                            : item.thumbnail,
+                    }))
+                    : obj.history,
+                sourceImage: null,
+                previewImage: null,
+                mask: null,
+            }
+            
+        default:
+            return data
+    }
 }
 
 /**

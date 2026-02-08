@@ -552,6 +552,7 @@
             "description": "캐릭터 프롬프트, 씬 데이터 등 모든 설정을 백업하고 복원합니다.",
             "export": "백업 내보내기",
             "exportDesc": "모든 데이터를 JSON 파일로 저장합니다.",
+            "excludeImages": "이미지 데이터 제외 (빠른 백업)",
             "import": "백업 복원",
             "importDesc": "JSON 파일에서 데이터를 복원합니다.",
             "autoBackup": "자동 백업",

@@ -253,6 +253,12 @@ async function convertMaskToGrayscale(maskBase64: string, targetWidth: number, t
 
             // Export as PNG and strip header
             const dataUrl = canvas.toDataURL('image/png')
+            
+            // CRITICAL: Release canvas and image memory to prevent OOM
+            canvas.width = 0
+            canvas.height = 0
+            img.src = ''
+            
             resolve(stripBase64Header(dataUrl))
         }
         img.onerror = () => reject(new Error('Mask image load failed'))
@@ -341,6 +347,12 @@ function processCharacterImage(imageBase64: string): Promise<string> {
 
             // Export as JPEG quality 0.95
             const dataUrl = canvas.toDataURL('image/jpeg', 0.95)
+            
+            // CRITICAL: Release canvas and image memory to prevent OOM
+            canvas.width = 0
+            canvas.height = 0
+            img.src = ''
+            
             resolve(dataUrl.split(',')[1])
         }
         img.onerror = () => reject(new Error("Image load failed"))

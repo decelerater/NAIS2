@@ -53,7 +53,7 @@ import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { getVersion } from '@tauri-apps/api/app'
 import { useUpdateStore, setCurrentUpdateObject, installPendingUpdate } from '@/stores/update-store'
-import { exportAllData, importAllData, getStoreSizes } from '@/lib/indexed-db'
+import { exportAllData, importAllData, getStoreSizes, ExportOptions } from '@/lib/indexed-db'
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs'
 
 const LANGUAGES = [
@@ -100,6 +100,7 @@ export default function Settings() {
     
     // 백업 관련 상태
     const [isExporting, setIsExporting] = useState(false)
+    const [excludeImagesOnExport, setExcludeImagesOnExport] = useState(true)  // Default: exclude images for faster export
     const [isImporting, setIsImporting] = useState(false)
     const [storeSizes, setStoreSizes] = useState<{ [key: string]: number }>({})
     const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
@@ -200,7 +201,8 @@ export default function Settings() {
     const handleExportBackup = async () => {
         setIsExporting(true)
         try {
-            const backup = await exportAllData()
+            const options: ExportOptions = { excludeImages: excludeImagesOnExport }
+            const backup = await exportAllData(options)
             const storeCount = Object.keys(backup).filter(k => !k.startsWith('_')).length
             
             // 파일 저장 다이얼로그
@@ -1031,24 +1033,40 @@ export default function Settings() {
                             
                             {/* Export/Import */}
                             <div className="border border-border/50 rounded-xl p-6 space-y-6 bg-card/30">
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-1">
-                                        <label className="text-sm font-medium flex items-center gap-2">
-                                            <Download className="h-4 w-4 text-blue-500" />
-                                            {t('settingsPage.backup.export')}
-                                        </label>
-                                        <p className="text-xs text-muted-foreground">
-                                            {t('settingsPage.backup.exportDesc')}
-                                        </p>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <label className="text-sm font-medium flex items-center gap-2">
+                                                <Download className="h-4 w-4 text-blue-500" />
+                                                {t('settingsPage.backup.export')}
+                                            </label>
+                                            <p className="text-xs text-muted-foreground">
+                                                {t('settingsPage.backup.exportDesc')}
+                                            </p>
+                                        </div>
+                                        <Button onClick={handleExportBackup} disabled={isExporting}>
+                                            {isExporting ? (
+                                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                            ) : (
+                                                <Download className="h-4 w-4 mr-2" />
+                                            )}
+                                            {isExporting ? t('settingsPage.backup.exporting') : t('settingsPage.backup.export')}
+                                        </Button>
                                     </div>
-                                    <Button onClick={handleExportBackup} disabled={isExporting}>
-                                        {isExporting ? (
-                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                        ) : (
-                                            <Download className="h-4 w-4 mr-2" />
-                                        )}
-                                        {isExporting ? t('settingsPage.backup.exporting') : t('settingsPage.backup.export')}
-                                    </Button>
+                                    
+                                    {/* Exclude Images Option */}
+                                    <div className="flex items-center gap-3 pl-6">
+                                        <input
+                                            type="checkbox"
+                                            id="excludeImages"
+                                            checked={excludeImagesOnExport}
+                                            onChange={(e) => setExcludeImagesOnExport(e.target.checked)}
+                                            className="h-4 w-4 rounded border-border"
+                                        />
+                                        <label htmlFor="excludeImages" className="text-sm text-muted-foreground cursor-pointer">
+                                            {t('settingsPage.backup.excludeImages', '이미지 데이터 제외 (빠른 백업)')}
+                                        </label>
+                                    </div>
                                 </div>
                                 
                                 <div className="border-t border-border/30 pt-6">

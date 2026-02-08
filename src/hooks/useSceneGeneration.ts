@@ -10,6 +10,7 @@ import { generateImage, generateImageStream, GenerationParams } from '@/services
 import { BaseDirectory, writeFile, mkdir, exists } from '@tauri-apps/plugin-fs'
 import { pictureDir, join } from '@tauri-apps/api/path'
 import { processWildcards } from '@/lib/fragment-processor'
+import { createThumbnail } from '@/lib/image-utils'
 import { useCharacterStore } from '@/stores/character-store'
 
 // Module-level variable to prevent concurrent processing
@@ -320,11 +321,14 @@ export function useSceneGeneration() {
 
                         addImageToScene(activePresetId, scene.id, fullPath)
 
-                        // Add to Global History
+                        // Add to Global History (with proper thumbnail, not full image)
+                        const thumbnailData = result.imageData 
+                            ? await createThumbnail(`data:${mimeType};base64,${result.imageData}`)
+                            : undefined
                         useGenerationStore.getState().addToHistory({
                             id: Date.now().toString(),
                             url: fullPath,
-                            thumbnail: result.imageData ? `data:image/png;base64,${result.imageData}` : undefined,
+                            thumbnail: thumbnailData,
                             prompt: finalPrompt,
                             seed: params.seed,
                             timestamp: new Date()
