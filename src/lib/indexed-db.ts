@@ -406,19 +406,12 @@ export async function migrateFromLocalStorage(keys: string[]): Promise<void> {
     }
 }
 
-export interface ExportOptions {
-    /** If true, excludes large image data (base64) from character-store and generation history thumbnails */
-    excludeImages?: boolean
-}
-
 /**
  * 전체 데이터 백업 (JSON export)
  * 데이터 손실 방지를 위한 수동 백업 기능
- * @param options - Export options
+ * 재생성 가능한 캐시(encodedVibe, thumbnails)는 자동으로 제외됩니다.
  */
-export async function exportAllData(options: ExportOptions = {}): Promise<{ [key: string]: unknown }> {
-    const { excludeImages = false } = options
-    
+export async function exportAllData(): Promise<{ [key: string]: unknown }> {
     const keys = [
         'nais2-generation',
         'nais2-character-store',
@@ -436,8 +429,7 @@ export async function exportAllData(options: ExportOptions = {}): Promise<{ [key
     
     const backup: { [key: string]: unknown } = {
         _exportedAt: new Date().toISOString(),
-        _version: '2.2',  // Version bump for excludeImages support
-        _excludedImages: excludeImages,
+        _version: '2.3',  // Version bump: always exclude regenerable cache
     }
     
     for (const key of keys) {
@@ -446,10 +438,8 @@ export async function exportAllData(options: ExportOptions = {}): Promise<{ [key
             if (data) {
                 let parsed = JSON.parse(data)
                 
-                // Filter out large image data if excludeImages is enabled
-                if (excludeImages) {
-                    parsed = filterLargeImageData(key, parsed)
-                }
+                // Always filter out regenerable cache data
+                parsed = filterLargeImageData(key, parsed)
                 
                 backup[key] = parsed
             }
@@ -469,7 +459,7 @@ export async function exportAllData(options: ExportOptions = {}): Promise<{ [key
         console.error('[Backup] Failed to export wildcard content:', err)
     }
     
-    console.log('[Backup] Export complete:', Object.keys(backup).length - 3, 'stores', excludeImages ? '(images excluded)' : '')
+    console.log('[Backup] Export complete:', Object.keys(backup).length - 2, 'stores (regenerable cache excluded)')
     return backup
 }
 

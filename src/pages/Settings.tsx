@@ -53,7 +53,7 @@ import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { getVersion } from '@tauri-apps/api/app'
 import { useUpdateStore, setCurrentUpdateObject, installPendingUpdate } from '@/stores/update-store'
-import { exportAllData, importAllData, getStoreSizes, ExportOptions } from '@/lib/indexed-db'
+import { exportAllData, importAllData, getStoreSizes } from '@/lib/indexed-db'
 import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs'
 
 const LANGUAGES = [
@@ -100,7 +100,6 @@ export default function Settings() {
     
     // 백업 관련 상태
     const [isExporting, setIsExporting] = useState(false)
-    const [excludeImagesOnExport, setExcludeImagesOnExport] = useState(true)  // Default: exclude images for faster export
     const [isImporting, setIsImporting] = useState(false)
     const [storeSizes, setStoreSizes] = useState<{ [key: string]: number }>({})
     const [lastBackupTime, setLastBackupTime] = useState<string | null>(null)
@@ -201,8 +200,7 @@ export default function Settings() {
     const handleExportBackup = async () => {
         setIsExporting(true)
         try {
-            const options: ExportOptions = { excludeImages: excludeImagesOnExport }
-            const backup = await exportAllData(options)
+            const backup = await exportAllData()
             const storeCount = Object.keys(backup).filter(k => !k.startsWith('_')).length
             
             // 파일 저장 다이얼로그
@@ -1052,20 +1050,6 @@ export default function Settings() {
                                             )}
                                             {isExporting ? t('settingsPage.backup.exporting') : t('settingsPage.backup.export')}
                                         </Button>
-                                    </div>
-                                    
-                                    {/* Exclude Images Option */}
-                                    <div className="flex items-center gap-3 pl-6">
-                                        <input
-                                            type="checkbox"
-                                            id="excludeImages"
-                                            checked={excludeImagesOnExport}
-                                            onChange={(e) => setExcludeImagesOnExport(e.target.checked)}
-                                            className="h-4 w-4 rounded border-border"
-                                        />
-                                        <label htmlFor="excludeImages" className="text-sm text-muted-foreground cursor-pointer">
-                                            {t('settingsPage.backup.excludeImages', '재생성 가능한 캐시 제외 (빠른 백업)')}
-                                        </label>
                                     </div>
                                 </div>
                                 

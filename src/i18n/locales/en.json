@@ -524,7 +524,6 @@
             "description": "Backup and restore all settings including character prompts, scene data, etc.",
             "export": "Export Backup",
             "exportDesc": "Save all data as a JSON file.",
-            "excludeImages": "Exclude regenerable cache (faster backup)",
             "import": "Restore Backup",
             "importDesc": "Restore data from a JSON backup file.",
             "autoBackup": "Auto Backup",
