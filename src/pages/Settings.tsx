@@ -1064,7 +1064,7 @@ export default function Settings() {
                                             className="h-4 w-4 rounded border-border"
                                         />
                                         <label htmlFor="excludeImages" className="text-sm text-muted-foreground cursor-pointer">
-                                            {t('settingsPage.backup.excludeImages', '이미지 데이터 제외 (빠른 백업)')}
+                                            {t('settingsPage.backup.excludeImages', '재생성 가능한 캐시 제외 (빠른 백업)')}
                                         </label>
                                     </div>
                                 </div>

@@ -474,8 +474,9 @@ export async function exportAllData(options: ExportOptions = {}): Promise<{ [key
 }
 
 /**
- * Filter out large base64 image data from store data
- * Preserves file paths and metadata, only removes embedded base64 images
+ * Filter out large regenerable data from store data
+ * IMPORTANT: Character/Vibe base64 images are NOT excluded because they have no file backup
+ * Only excludes: encodedVibe (can be regenerated via API), history thumbnails (files exist)
  */
 function filterLargeImageData(key: string, data: unknown): unknown {
     if (!data || typeof data !== 'object') return data
@@ -492,31 +493,28 @@ function filterLargeImageData(key: string, data: unknown): unknown {
     
     switch (key) {
         case 'nais2-character-store':
-            // Filter characterImages and vibeImages base64 data
+            // Only remove encodedVibe (can be regenerated via API)
+            // KEEP base64 images - they have no file backup!
             return {
                 ...obj,
                 characterImages: Array.isArray(obj.characterImages) 
                     ? obj.characterImages.map((img: Record<string, unknown>) => ({
                         ...img,
-                        base64: img.base64 && typeof img.base64 === 'string' && img.base64.startsWith('data:') 
-                            ? '[IMAGE_EXCLUDED]' 
-                            : img.base64,
-                        encodedVibe: undefined  // Large encoded vibe data
+                        // base64 is KEPT - no file backup exists
+                        encodedVibe: undefined  // Can be regenerated via API
                     }))
                     : obj.characterImages,
                 vibeImages: Array.isArray(obj.vibeImages)
                     ? obj.vibeImages.map((img: Record<string, unknown>) => ({
                         ...img,
-                        base64: img.base64 && typeof img.base64 === 'string' && img.base64.startsWith('data:')
-                            ? '[IMAGE_EXCLUDED]'
-                            : img.base64,
-                        encodedVibe: undefined  // Large encoded vibe data
+                        // base64 is KEPT - no file backup exists
+                        encodedVibe: undefined  // Can be regenerated via API
                     }))
                     : obj.vibeImages,
             }
             
         case 'nais2-generation':
-            // Filter history thumbnails and source images
+            // Filter history thumbnails (files exist) and temp images
             return {
                 ...obj,
                 history: Array.isArray(obj.history)
