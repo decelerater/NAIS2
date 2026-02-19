@@ -9,7 +9,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Users, Upload, X, Zap, Database, Lock, Eye, EyeOff } from 'lucide-react'
+import { Users, Upload, X, Zap, Database, Lock, Eye, EyeOff, Image as ImageIcon } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Slider } from '@/components/ui/slider'
 import { Label } from '@/components/ui/label'
@@ -88,7 +88,7 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
             const file = files[i]
             const base64 = await convertToBase64(file)
             if (mode === 'character') {
-                addCharacterImage(base64)
+                await addCharacterImage(base64)
             } else {
                 // Try to extract pre-encoded vibe from PNG metadata
                 try {
@@ -96,17 +96,17 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
                     if (metadata?.encodedVibes && metadata.encodedVibes.length > 0) {
                         // Use first encoded vibe and info/strength from metadata
                         const info = metadata.vibeTransferInfo?.[0]
-                        addVibeImage(
+                        await addVibeImage(
                             base64,
                             metadata.encodedVibes[0],
                             info?.informationExtracted ?? 1.0,
                             info?.strength ?? 0.6
                         )
                     } else {
-                        addVibeImage(base64)
+                        await addVibeImage(base64)
                     }
                 } catch {
-                    addVibeImage(base64)
+                    await addVibeImage(base64)
                 }
             }
         }
@@ -243,14 +243,21 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
                         )}
                     >
                         <div className="relative shrink-0 w-24 h-24 bg-muted rounded-md overflow-hidden border flex items-center justify-center group/image">
-                            <img 
-                                src={img.base64} 
-                                alt="Reference" 
-                                className={cn(
-                                    "w-full h-full object-cover transition-all",
-                                    !isEnabled && "grayscale"
-                                )} 
-                            />
+                            {img.base64 ? (
+                                <img 
+                                    src={img.base64} 
+                                    alt="Reference" 
+                                    className={cn(
+                                        "w-full h-full object-cover transition-all",
+                                        !isEnabled && "grayscale"
+                                    )} 
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center text-muted-foreground p-2 text-center">
+                                    <ImageIcon className="w-8 h-8 opacity-50 mb-1 animate-pulse" />
+                                    <span className="text-[9px] leading-tight">{t('common.loading', 'Loading...')}</span>
+                                </div>
+                            )}
                             {/* 삭제 버튼 */}
                             <Button
                                 variant="destructive"

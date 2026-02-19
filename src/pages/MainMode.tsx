@@ -354,6 +354,15 @@ export default function MainMode() {
         }
     }, [])
 
+    // Memory cleanup on unmount - release large Base64 data when leaving main mode
+    // This prevents OOM when switching between modes (Issue #6)
+    useEffect(() => {
+        return () => {
+            console.log('[MainMode] Unmounting - clearing runtime data')
+            useGenerationStore.getState().clearRuntimeData()
+        }
+    }, [])
+
     // Timer Logic
     const [elapsedTime, setElapsedTime] = useState(0)
 

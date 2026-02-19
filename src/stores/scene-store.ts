@@ -86,6 +86,9 @@ interface SceneState {
     streamingImage: string | null
     streamingProgress: number
     setStreamingData: (sceneId: string | null, image: string | null, progress: number) => void
+    
+    // Memory cleanup - call when leaving scene mode to release streaming data
+    clearRuntimeData: () => void
 
     // History Refresh Trigger
     historyRefreshTrigger: number
@@ -661,6 +664,17 @@ export const useSceneStore = create<SceneState>()(
                         streamingProgress: progress
                     })
                 }
+            },
+
+            // Memory cleanup - release streaming data when leaving scene mode
+            // This prevents OOM when switching between modes (Issue #6)
+            clearRuntimeData: () => {
+                console.log('[SceneStore] Clearing runtime data to free memory')
+                set({
+                    streamingSceneId: null,
+                    streamingImage: null,
+                    streamingProgress: 0
+                })
             },
 
             // History Refresh Trigger

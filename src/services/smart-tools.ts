@@ -78,56 +78,23 @@ class SmartToolsService {
 
     /**
      * Remove background from an image using Hugging Face Space
-     * Tries multiple Spaces for reliability
+     * Uses BRIA-RMBG-2.0 API with fallback to anime-remove-background
      */
     public async removeBackground(
         imageUrl: string,
         _progressCallback?: (progress: number) => void
     ): Promise<string> {
-        // Step 0: Try Local Python Server first
-        try {
-            console.log("SmartTools: Check Local Server...");
-            await this.startLocalServer(); // Ensure server is running (auto-started by backend, but check health)
-
-            // Check health
-            const health = await fetch('http://127.0.0.1:8002/health');
-            if (health.ok) {
-                console.log("SmartTools: Local Server is healthy. Using local RMBG...");
-                const response = await fetch(imageUrl);
-                const blob = await response.blob();
-
-                const formData = new FormData();
-                formData.append('image', blob);
-                formData.append('model', 'isnet-general-use'); // Or anime model?
-
-                // Note: Our current tagger-server (main.py) only has /tag endpoint. 
-                // We need to implement /rmbg endpoint in python first?
-                // Wait, duplicate user request implies they expect it to work.
-                // But wait, if python server doesn't have /rmbg, we can't call it.
-                // Checking python code is needed.
-
-                // If python doesn't support it, we must rely on remote.
-                // BUT the remote "strange person" issue is due to Gradio API default behavior when busy/error.
-
-                // Let's look at the existing code again. It tries BRIA first.
-            }
-        } catch (e) {
-            console.warn("Local server check failed:", e);
-        }
-
         const response = await fetch(imageUrl);
         const blob = await response.blob();
 
-        // Step 1: Try BRIA-RMBG-2.0
+        // Step 1: Try BRIA-RMBG-2.0 (best quality)
         try {
             console.log("SmartTools: Trying briaai/BRIA-RMBG-2.0...");
             const client = await Client.connect("briaai/BRIA-RMBG-2.0");
             const result = await client.predict("/image", { image: blob });
 
-            // Validate result is not a placeholder (can check if it's the same image or specific size? hard to tell)
-            // But usually API error throws.
-
-            const outputData = (result.data as any[])?.[1];
+            // Result can be at data[0][0] or data[1] depending on API version
+            const outputData = (result.data as any[])?.[0]?.[0] || (result.data as any[])?.[1];
             if (outputData) {
                 return await this.processGradioOutput(outputData);
             }

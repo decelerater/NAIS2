@@ -161,6 +161,9 @@ interface GenerationState {
     setIsGenerating: (v: boolean) => void // Only for Main Mode use ideally
     setGeneratingMode: (mode: 'main' | 'scene' | null) => void
     setStreamProgress: (progress: number) => void
+    
+    // Memory cleanup - call when leaving main mode to release large Base64 data
+    clearRuntimeData: () => void
 }
 
 export const useGenerationStore = create<GenerationState>()(
@@ -267,6 +270,18 @@ export const useGenerationStore = create<GenerationState>()(
             setMask: (mask) => set({ mask }),
             setI2IMode: (mode) => set({ i2iMode: mode }),
             resetI2IParams: () => set({ sourceImage: null, mask: null, strength: 0.7, noise: 0.0, inpaintingPrompt: '', i2iMode: null }),
+
+            // Memory cleanup - release large runtime data (previewImage, sourceImage, mask)
+            // Call this when leaving main mode to prevent OOM
+            clearRuntimeData: () => {
+                console.log('[GenerationStore] Clearing runtime data to free memory')
+                set({ 
+                    previewImage: null, 
+                    sourceImage: null, 
+                    mask: null,
+                    streamProgress: 0
+                })
+            },
 
             cancelGeneration: () => {
                 const { abortController, seedLocked } = get()
@@ -449,18 +464,18 @@ export const useGenerationStore = create<GenerationState>()(
                             noise,
                             mask: mask || undefined,
 
-                            // Precise Reference (캐릭터 참조)
-                            charImages: characterImages.map(img => img.base64),
-                            charStrength: characterImages.map(img => img.strength),
-                            charFidelity: characterImages.map(img => img.fidelity ?? 0.6),
-                            charReferenceType: characterImages.map(img => img.referenceType ?? 'character&style'),
-                            charCacheKeys: characterImages.map(img => img.cacheKey || null),
+                            // Precise Reference (캐릭터 참조) - filter out images without base64 loaded
+                            charImages: characterImages.filter(img => img.base64).map(img => img.base64!),
+                            charStrength: characterImages.filter(img => img.base64).map(img => img.strength),
+                            charFidelity: characterImages.filter(img => img.base64).map(img => img.fidelity ?? 0.6),
+                            charReferenceType: characterImages.filter(img => img.base64).map(img => img.referenceType ?? 'character&style'),
+                            charCacheKeys: characterImages.filter(img => img.base64).map(img => img.cacheKey || null),
 
-                            // Vibe Transfer
-                            vibeImages: vibeImages.map(img => img.base64),
-                            vibeInfo: vibeImages.map(img => img.informationExtracted),
-                            vibeStrength: vibeImages.map(img => img.strength),
-                            preEncodedVibes: vibeImages.map(img => img.encodedVibe || null),
+                            // Vibe Transfer - filter out images without base64 loaded
+                            vibeImages: vibeImages.filter(img => img.base64).map(img => img.base64!),
+                            vibeInfo: vibeImages.filter(img => img.base64).map(img => img.informationExtracted),
+                            vibeStrength: vibeImages.filter(img => img.base64).map(img => img.strength),
+                            preEncodedVibes: vibeImages.filter(img => img.base64).map(img => img.encodedVibe || null),
 
                             // Character Prompts (V4 char_captions with positions)
                             characterPrompts: processedCharacterPrompts,

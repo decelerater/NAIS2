@@ -1,7 +1,7 @@
 """
 NAIS2 Tagger Server - Lightweight Version
 Tag analysis using WD14 Tagger (ONNX Runtime CPU-only)
-Background removal is handled via cloud API in the frontend.
+Background removal is handled via cloud API (BRIA-RMBG-2.0) in the frontend.
 """
 import os
 import sys
@@ -17,7 +17,6 @@ import numpy as np
 import onnxruntime as ort
 import pandas as pd
 from huggingface_hub import hf_hub_download
-from rembg import remove, new_session
 
 
 # Global download status for UI display
@@ -86,7 +85,6 @@ MODEL_FILE = "model.onnx"
 TAGS_FILE = "selected_tags.csv"
 model_session = None
 tags_df = None
-rembg_session = None
 
 def load_model():
     global model_session, tags_df
@@ -118,10 +116,6 @@ def load_model():
     
     print("Loading tags...")
     tags_df = pd.read_csv(tags_path)
-    
-    print("Initializing rembg session...")
-    global rembg_session
-    rembg_session = new_session("isnet-general-use") # Default model
     print("Models loaded successfully.")
 
 def preprocess_image(image: Image.Image, size=448):
@@ -180,25 +174,6 @@ async def tag_image(file: UploadFile = File(...), threshold: float = 0.35):
         
     except Exception as e:
         return {"error": str(e)}
-
-@app.post("/rmbg")
-async def remove_background(image: UploadFile = File(...)):
-    """
-    Remove background from image using rembg
-    """
-    if rembg_session is None:
-        return Response(content="Model not loaded", status_code=500)
-    
-    try:
-        contents = await image.read()
-        # rembg expects bytes or PIL image
-        output = remove(contents, session=rembg_session)
-        
-        # Return as PNG
-        return Response(content=output, media_type="image/png")
-    except Exception as e:
-        print(f"RMBG Error: {e}")
-        return Response(content=str(e), status_code=500)
 
 @app.get("/download-status")
 def get_download_status():

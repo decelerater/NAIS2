@@ -213,18 +213,18 @@ export function useSceneGeneration() {
                     noise: genState.noise,
                     mask: genState.mask || undefined,
 
-                    // Precise Reference (캐릭터 참조)
-                    charImages: characterImages.map(img => img.base64),
-                    charStrength: characterImages.map(img => img.strength),
-                    charFidelity: characterImages.map(img => img.fidelity ?? 0.6),
-                    charReferenceType: characterImages.map(img => img.referenceType ?? 'character&style'),
-                    charCacheKeys: characterImages.map(img => img.cacheKey || null),
+                    // Precise Reference (캐릭터 참조) - filter out images without base64 loaded
+                    charImages: characterImages.filter(img => img.base64).map(img => img.base64!),
+                    charStrength: characterImages.filter(img => img.base64).map(img => img.strength),
+                    charFidelity: characterImages.filter(img => img.base64).map(img => img.fidelity ?? 0.6),
+                    charReferenceType: characterImages.filter(img => img.base64).map(img => img.referenceType ?? 'character&style'),
+                    charCacheKeys: characterImages.filter(img => img.base64).map(img => img.cacheKey || null),
 
-                    // Vibe Transfer
-                    vibeImages: vibeImages.map(img => img.base64),
-                    vibeInfo: vibeImages.map(img => img.informationExtracted),
-                    vibeStrength: vibeImages.map(img => img.strength),
-                    preEncodedVibes: vibeImages.map(img => img.encodedVibe || null),
+                    // Vibe Transfer - filter out images without base64 loaded
+                    vibeImages: vibeImages.filter(img => img.base64).map(img => img.base64!),
+                    vibeInfo: vibeImages.filter(img => img.base64).map(img => img.informationExtracted),
+                    vibeStrength: vibeImages.filter(img => img.base64).map(img => img.strength),
+                    preEncodedVibes: vibeImages.filter(img => img.base64).map(img => img.encodedVibe || null),
 
                     // Character Prompts - already processed with fragment substitution
                     characterPrompts: processedCharacterPrompts,

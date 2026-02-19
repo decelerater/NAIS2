@@ -120,6 +120,15 @@ export default function SceneDetail() {
         return () => window.removeEventListener('keydown', handleEsc)
     }, [viewerImageSrc, nav])
 
+    // Memory cleanup on unmount - release streaming data when leaving scene detail
+    // This prevents OOM when switching between modes (Issue #6)
+    useEffect(() => {
+        return () => {
+            console.log('[SceneDetail] Unmounting - clearing streaming data')
+            useSceneStore.getState().clearRuntimeData()
+        }
+    }, [])
+
     useEffect(() => {
         if (scene) {
             setEditName(scene.name)

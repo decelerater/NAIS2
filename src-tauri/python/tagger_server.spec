@@ -12,15 +12,13 @@ Background removal is handled via cloud API (Hugging Face) instead.
 """
 
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_data_files, copy_metadata
+from PyInstaller.utils.hooks import collect_data_files
 
 block_cipher = None
 
 # Collect ONNX runtime data files only
 datas = []
 datas += collect_data_files('onnxruntime')
-datas += collect_data_files('rembg')
-datas += copy_metadata('pymatting')  # Required for rembg to find pymatting version
 
 # Hidden imports for dynamic loading (minimal set)
 hiddenimports = [
@@ -39,11 +37,6 @@ hiddenimports = [
     'PIL',
     'numpy',
     'huggingface_hub',
-    'rembg',
-    'scipy',
-    'skimage',
-    'filetype',
-    'pymatting',
 ]
 
 # Exclude heavy libraries that we don't need (rembg, torch, etc.)
