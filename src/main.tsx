@@ -256,7 +256,7 @@ async function startApp() {
     // This is non-blocking and runs after the app is visible
     setTimeout(async () => {
         try {
-            await useCharacterStore.getState().loadImagesFromFiles()
+            await useCharacterStore.getState().ensureImagesLoaded()
             console.log('[Startup] Reference images loaded from files')
         } catch (err) {
             console.error('[Startup] Failed to load reference images:', err)

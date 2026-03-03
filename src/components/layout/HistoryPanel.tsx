@@ -495,13 +495,16 @@ export function HistoryPanel() {
 
             images.sort((a, b) => b.timestamp - a.timestamp)
 
+            // MEMORY OPTIMIZATION: Limit total file entries to prevent large state
+            const MAX_HISTORY_FILES = 200
+            const limitedImages = images.slice(0, MAX_HISTORY_FILES)
+
             // Merge with existing temporary images
             setSavedImages(prev => {
                 const tempImages = prev.filter(img => img.isTemporary)
-                // Enforce limit on merge just in case
                 const sortedTemp = tempImages.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10)
 
-                const combined = [...images, ...sortedTemp]
+                const combined = [...limitedImages, ...sortedTemp]
                 return combined.sort((a, b) => b.timestamp - a.timestamp)
             })
 
@@ -896,7 +899,7 @@ export function HistoryPanel() {
                 const data = await readFile(image.path)
                 const base64 = arrayBufferToBase64(data)
                 imageData = `data:image/png;base64,${base64}`
-                setImageThumbnails(prev => ({ ...prev, [image.path]: imageData }))
+                // NOT caching full base64 in thumbnails - use directly
             } catch { return }
         }
         if (!imageData) return
@@ -914,7 +917,7 @@ export function HistoryPanel() {
                 const data = await readFile(image.path)
                 const base64 = arrayBufferToBase64(data)
                 imageData = `data:image/png;base64,${base64}`
-                setImageThumbnails(prev => ({ ...prev, [image.path]: imageData }))
+                // NOT caching full base64 in thumbnails - use directly
             } catch { return }
         }
         if (!imageData) return

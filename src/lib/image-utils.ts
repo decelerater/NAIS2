@@ -2,6 +2,99 @@
  * Image utility functions for memory-efficient image handling
  */
 
+import { writeFile, readFile, remove, mkdir, exists } from '@tauri-apps/plugin-fs'
+import { appDataDir, join } from '@tauri-apps/api/path'
+
+// ============================================
+// Reference Image File Storage
+// ============================================
+
+let _referencesDir: string | null = null
+
+/** Get (or create) the references directory: AppData/NAIS2/references/ */
+export async function getReferencesDir(): Promise<string> {
+    if (_referencesDir) return _referencesDir
+    const appData = await appDataDir()
+    const dir = await join(appData, 'references')
+    if (!(await exists(dir))) {
+        await mkdir(dir, { recursive: true })
+    }
+    _referencesDir = dir
+    return dir
+}
+
+/** Save a base64 image to file. Returns the file path. */
+export async function saveReferenceImage(id: string, base64: string): Promise<string> {
+    const dir = await getReferencesDir()
+    const filePath = await join(dir, `${id}.bin`)
+    // Strip data URI prefix if present
+    const raw = base64.includes(',') ? base64.split(',')[1] : base64
+    const binary = Uint8Array.from(atob(raw), c => c.charCodeAt(0))
+    await writeFile(filePath, binary)
+    return filePath
+}
+
+/** Load a base64 image from file. Returns data URI string or null if not found. */
+export async function loadReferenceImage(filePath: string): Promise<string | null> {
+    try {
+        if (!(await exists(filePath))) return null
+        const data = await readFile(filePath)
+        // Convert to base64
+        let binary = ''
+        const bytes = new Uint8Array(data)
+        const chunkSize = 8192
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+        }
+        return `data:image/png;base64,${btoa(binary)}`
+    } catch (e) {
+        console.error(`[image-utils] Failed to load reference image: ${filePath}`, e)
+        return null
+    }
+}
+
+/** Delete a reference image file. */
+export async function deleteReferenceImage(filePath: string): Promise<void> {
+    try {
+        if (await exists(filePath)) {
+            await remove(filePath)
+        }
+    } catch (e) {
+        console.warn(`[image-utils] Failed to delete reference image: ${filePath}`, e)
+    }
+}
+
+/** Save encoded vibe data to file. Returns file path. */
+export async function saveEncodedVibe(id: string, encodedVibe: string): Promise<string> {
+    const dir = await getReferencesDir()
+    const filePath = await join(dir, `${id}_vibe.bin`)
+    const binary = Uint8Array.from(atob(encodedVibe), c => c.charCodeAt(0))
+    await writeFile(filePath, binary)
+    return filePath
+}
+
+/** Load encoded vibe data from file. Returns raw base64 string or null. */
+export async function loadEncodedVibe(filePath: string): Promise<string | null> {
+    try {
+        if (!(await exists(filePath))) return null
+        const data = await readFile(filePath)
+        const bytes = new Uint8Array(data)
+        let binary = ''
+        const chunkSize = 8192
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+        }
+        return btoa(binary)
+    } catch (e) {
+        console.error(`[image-utils] Failed to load encoded vibe: ${filePath}`, e)
+        return null
+    }
+}
+
+// ============================================
+// Thumbnail Generation
+// ============================================
+
 /**
  * Generate thumbnail from base64 image (max 256px, JPEG quality 0.7)
  * Memory-safe: properly releases canvas and image resources
@@ -64,113 +157,4 @@ export const createThumbnail = (base64Image: string, maxSize = 256): Promise<str
         }
         img.src = base64Image
     })
-}
-
-/**
- * Reference image file management utilities
- * Stores images in AppData/NAIS2/references/ to avoid memory bloat
- */
-
-import { appDataDir, join } from '@tauri-apps/api/path'
-import { writeFile, readFile, remove, mkdir, exists } from '@tauri-apps/plugin-fs'
-
-const REFERENCES_DIR = 'references'
-
-/**
- * Get the references directory path
- */
-export const getReferencesDir = async (): Promise<string> => {
-    const appData = await appDataDir()
-    return await join(appData, REFERENCES_DIR)
-}
-
-/**
- * Ensure references directory exists
- */
-export const ensureReferencesDir = async (): Promise<string> => {
-    const refDir = await getReferencesDir()
-    if (!(await exists(refDir))) {
-        await mkdir(refDir, { recursive: true })
-    }
-    return refDir
-}
-
-/**
- * Save base64 image to file and return file path
- * @param base64Image - Full base64 string (with data: prefix)
- * @param id - Unique identifier for the file
- * @param type - 'character' or 'vibe'
- * @returns File path
- */
-export const saveReferenceImage = async (
-    base64Image: string, 
-    id: string, 
-    type: 'character' | 'vibe'
-): Promise<string> => {
-    const refDir = await ensureReferencesDir()
-    
-    // Extract base64 data (remove data:image/...;base64, prefix)
-    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '')
-    const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
-    
-    // Determine extension from data prefix
-    const ext = base64Image.includes('image/webp') ? 'webp' : 'png'
-    const fileName = `${type}_${id}.${ext}`
-    const filePath = await join(refDir, fileName)
-    
-    await writeFile(filePath, binaryData)
-    console.log(`[ImageUtils] Saved reference image: ${filePath}`)
-    
-    return filePath
-}
-
-/**
- * Load base64 image from file path
- * @param filePath - Absolute file path
- * @returns Base64 string with data: prefix, or null if file doesn't exist
- */
-export const loadReferenceImage = async (filePath: string): Promise<string | null> => {
-    try {
-        if (!(await exists(filePath))) {
-            console.warn(`[ImageUtils] Reference image not found: ${filePath}`)
-            return null
-        }
-        
-        const data = await readFile(filePath)
-        const base64 = btoa(String.fromCharCode(...data))
-        
-        // Determine mime type from extension
-        const ext = filePath.toLowerCase().split('.').pop()
-        const mimeType = ext === 'webp' ? 'image/webp' : 'image/png'
-        
-        return `data:${mimeType};base64,${base64}`
-    } catch (e) {
-        console.error(`[ImageUtils] Failed to load reference image: ${filePath}`, e)
-        return null
-    }
-}
-
-/**
- * Delete reference image file
- * @param filePath - Absolute file path
- */
-export const deleteReferenceImage = async (filePath: string): Promise<void> => {
-    try {
-        if (await exists(filePath)) {
-            await remove(filePath)
-            console.log(`[ImageUtils] Deleted reference image: ${filePath}`)
-        }
-    } catch (e) {
-        console.error(`[ImageUtils] Failed to delete reference image: ${filePath}`, e)
-    }
-}
-
-/**
- * Check if a path is a file path (not base64)
- */
-export const isFilePath = (str: string): boolean => {
-    return !str.startsWith('data:') && (
-        str.includes('/') || str.includes('\\') || 
-        str.endsWith('.png') || str.endsWith('.webp') || str.endsWith('.jpg')
-    )
 }

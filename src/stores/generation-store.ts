@@ -308,7 +308,7 @@ export const useGenerationStore = create<GenerationState>()(
                 const {
                     basePrompt, additionalPrompt, detailPrompt, negativePrompt, inpaintingPrompt,
                     model, steps, cfgScale, cfgRescale, sampler, scheduler, smea, smeaDyn, variety,
-                    selectedResolution, seed, batchCount, lastGenerationTime,
+                    selectedResolution, batchCount, lastGenerationTime,
                     sourceImage, strength, noise, mask
                 } = get()
 
@@ -380,21 +380,24 @@ export const useGenerationStore = create<GenerationState>()(
                         // Wildcard Processing (handles both <filename> fragments and (a/b/c) random selection) - async
                         finalPrompt = await processWildcards(finalPrompt)
 
-                        // Get current seed (may be different for each batch)
-                        // If seed is 0, treat it as "random seed" request
-                        let currentSeed = get().seedLocked ? seed : (i === 0 ? seed : Math.floor(Math.random() * 4294967295))
+                        // Get current seed for this generation
+                        // Use the current store seed, then immediately set next seed
+                        let currentSeed = get().seed
                         if (currentSeed === 0) {
                             currentSeed = Math.floor(Math.random() * 4294967295)
                         }
 
-                        if (!get().seedLocked && i > 0) {
-                            set({ seed: currentSeed })
+                        // Immediately advance seed so UI shows next seed at generation start
+                        if (!get().seedLocked) {
+                            set({ seed: Math.floor(Math.random() * 4294967295) })
                         }
 
                         // Character & Vibe Data (활성화된 이미지만 필터링)
+                        // Ensure base64 data is loaded from files before generation
+                        await useCharacterStore.getState().ensureImagesLoaded()
                         const { characterImages: allCharImages, vibeImages: allVibeImages } = useCharacterStore.getState()
-                        const characterImages = allCharImages.filter(img => img.enabled !== false)
-                        const vibeImages = allVibeImages.filter(img => img.enabled !== false)
+                        const characterImages = allCharImages.filter(img => img.enabled !== false && img.base64)
+                        const vibeImages = allVibeImages.filter(img => img.enabled !== false && img.base64)
 
                         // Character Prompts (Position-based)
                         const { characters: characterPrompts, positionEnabled } = useCharacterPromptStore.getState()
@@ -634,10 +637,7 @@ export const useGenerationStore = create<GenerationState>()(
                             // Refresh Anlas balance
                             useAuthStore.getState().refreshAnlas()
 
-                            // New seed if not locked
-                            if (!get().seedLocked) {
-                                set({ seed: Math.floor(Math.random() * 4294967295) })
-                            }
+                            // Seed already advanced at generation start
 
                             // Apply generation delay between batches (not after the last one)
                             const { generationDelay } = useSettingsStore.getState()

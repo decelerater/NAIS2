@@ -152,9 +152,9 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
                         )}
                     >
                         <div className="relative shrink-0 w-24 h-24 bg-muted rounded-md overflow-hidden border flex items-center justify-center group/image">
-                            {img.base64 ? (
+                            {(img.thumbnail || img.base64) ? (
                                 <img 
-                                    src={img.base64} 
+                                    src={img.thumbnail || img.base64} 
                                     alt="Reference" 
                                     className={cn(
                                         "w-full h-full object-cover transition-all",
@@ -243,9 +243,9 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
                         )}
                     >
                         <div className="relative shrink-0 w-24 h-24 bg-muted rounded-md overflow-hidden border flex items-center justify-center group/image">
-                            {img.base64 ? (
+                            {(img.thumbnail || img.base64) ? (
                                 <img 
-                                    src={img.base64} 
+                                    src={img.thumbnail || img.base64} 
                                     alt="Reference" 
                                     className={cn(
                                         "w-full h-full object-cover transition-all",

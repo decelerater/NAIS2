@@ -24,7 +24,6 @@ export function useSceneGeneration() {
     // Stores
     const generationStore = useGenerationStore()
     const characterPromptStore = useCharacterPromptStore()
-    const characterStore = useCharacterStore()
 
     const {
         isGenerating,
@@ -141,8 +140,11 @@ export function useSceneGeneration() {
                 const finalPrompt = await processWildcards(parts.join(', '))
 
                 // Get Character & Vibe Data (활성화된 이미지만 필터링)
-                const characterImages = characterStore.characterImages.filter(img => img.enabled !== false)
-                const vibeImages = characterStore.vibeImages.filter(img => img.enabled !== false)
+                // Ensure base64 data is loaded from files before generation
+                await useCharacterStore.getState().ensureImagesLoaded()
+                const latestCharStore = useCharacterStore.getState()
+                const characterImages = latestCharStore.characterImages.filter(img => img.enabled !== false && img.base64)
+                const vibeImages = latestCharStore.vibeImages.filter(img => img.enabled !== false && img.base64)
                 const { characters: characterPrompts } = characterPromptStore
 
                 // Apply fragment/wildcard substitution to character prompts (async)
