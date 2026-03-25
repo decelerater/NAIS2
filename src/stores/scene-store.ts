@@ -471,8 +471,9 @@ export const useSceneStore = create<SceneState>()(
                             : p
                     ),
                 }))
-                // Trigger history refresh after adding image
-                get().triggerHistoryRefresh()
+                // NOTE: Removed triggerHistoryRefresh() here.
+                // HistoryPanel now uses instant event-based updates (newImageGenerated),
+                // so triggering a full directory rescan per image is no longer needed.
             },
 
             toggleFavorite: (presetId, sceneId, imageId) => {
@@ -983,30 +984,30 @@ export const useSceneStore = create<SceneState>()(
             name: 'nais2-scenes',
             storage: createJSONStorage(() => indexedDBStorage),
             partialize: (state) => {
-                // MEMORY OPTIMIZATION: Higher limit for persistence (was 50)
-                // Images are stored as file paths, not base64 - storage is minimal
+                // Images are stored as file paths, not base64 - storage is minimal per entry
                 const MAX_IMAGES_PERSIST = 2000
-                
+
                 return {
-                    // Exclude queueCount from persistence for faster UI updates
                     presets: state.presets.map(p => ({
                         ...p,
-                        scenes: p.scenes.map(s => ({
-                            ...s,
-                            queueCount: 0,
-                            // Limit stored images - keep favorites first, then newest (sorted by timestamp)
-                            images: (() => {
-                                if (s.images.length <= MAX_IMAGES_PERSIST) return s.images
-                                const favorites = s.images.filter(img => img.isFavorite)
-                                const nonFavorites = s.images
-                                    .filter(img => !img.isFavorite)
+                        scenes: p.scenes.map(s => {
+                            // Fast path: skip expensive sorting if under limit
+                            if (s.images.length <= MAX_IMAGES_PERSIST) {
+                                return { ...s, queueCount: 0 }
+                            }
+                            // Over limit: keep favorites + newest non-favorites
+                            const favorites = s.images.filter(img => img.isFavorite)
+                            const nonFavorites = s.images
+                                .filter(img => !img.isFavorite)
+                                .sort((a, b) => b.timestamp - a.timestamp)
+                            const keepCount = Math.max(0, MAX_IMAGES_PERSIST - favorites.length)
+                            return {
+                                ...s,
+                                queueCount: 0,
+                                images: [...favorites, ...nonFavorites.slice(0, keepCount)]
                                     .sort((a, b) => b.timestamp - a.timestamp)
-                                const keepCount = Math.max(0, MAX_IMAGES_PERSIST - favorites.length)
-                                // Merge and sort by timestamp for consistent display order
-                                return [...favorites, ...nonFavorites.slice(0, keepCount)]
-                                    .sort((a, b) => b.timestamp - a.timestamp)
-                            })()
-                        }))
+                            }
+                        })
                     })),
                     activePresetId: state.activePresetId,
                     gridColumns: state.gridColumns,

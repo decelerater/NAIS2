@@ -39,6 +39,9 @@ interface CharacterState {
 
     /** Load base64 data from files for all images (call before generation) */
     ensureImagesLoaded: () => Promise<void>
+
+    /** Release base64 data from memory (call after generation to free ~30-60MB) */
+    releaseImageData: () => void
 }
 
 const MAX_CHARACTER_IMAGES = 10
@@ -225,6 +228,26 @@ export const useCharacterStore = create<CharacterState>()(
                     _imagesLoaded: true,
                 })
                 console.log('[CharacterStore] Loaded ' + charImages.length + ' char + ' + vibeImgs.length + ' vibe images')
+            },
+
+            releaseImageData: () => {
+                const state = get()
+                // Only release if images have file paths (can be reloaded)
+                const hasFilePaths = [...state.characterImages, ...state.vibeImages].every(img => img.filePath || !img.base64)
+                if (!hasFilePaths) {
+                    console.log('[CharacterStore] Skipping release - some images have no file path')
+                    return
+                }
+                set({
+                    characterImages: state.characterImages.map(img =>
+                        img.filePath ? { ...img, base64: '', encodedVibe: undefined } : img
+                    ),
+                    vibeImages: state.vibeImages.map(img =>
+                        img.filePath ? { ...img, base64: '', encodedVibe: undefined } : img
+                    ),
+                    _imagesLoaded: false,
+                })
+                console.log('[CharacterStore] Released base64 data from memory')
             },
         }),
         {

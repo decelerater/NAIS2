@@ -598,10 +598,11 @@ export const useGenerationStore = create<GenerationState>()(
                                         fullPath = await join(picPath, outputDir, fileName)
                                     }
 
-                                    // Notify HistoryPanel immediately with image data
+                                    // Notify HistoryPanel (file path only — HistoryPanel uses
+                                    // convertFileSrc for file-based images, no base64 needed)
                                     try {
                                         window.dispatchEvent(new CustomEvent('newImageGenerated', {
-                                            detail: { path: fullPath, data: imageUrl }
+                                            detail: { path: fullPath }
                                         }))
                                     } catch (e) {
                                         console.warn('Failed to dispatch newImageGenerated event:', e)
@@ -675,6 +676,9 @@ export const useGenerationStore = create<GenerationState>()(
                     })
                 } finally {
                     set({ isGenerating: false, generatingMode: null, currentBatch: 0, abortController: null })
+                    // Release character/vibe base64 from memory after generation (~30-60MB)
+                    // They will be reloaded from files on next generation
+                    useCharacterStore.getState().releaseImageData()
                 }
             },
 

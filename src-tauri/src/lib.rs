@@ -343,13 +343,8 @@ async fn remove_background(image_base64: String) -> RemoveBackgroundResult {
 }
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, RunEvent, Url};
-use tauri_plugin_shell::{process::CommandChild, ShellExt};
-
-// Store for tracking tagger sidecar process
-#[derive(Clone)]
-pub struct TaggerState(pub Arc<Mutex<Option<CommandChild>>>);
+use std::sync::Mutex;
+use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, Url};
 
 // Store for tracking embedded webviews
 struct EmbeddedWebviews {
@@ -481,48 +476,8 @@ async fn zoom_embedded_browser(app: AppHandle, zoom_level: f64) -> Result<(), St
     Ok(())
 }
 
-#[tauri::command]
-async fn check_tagger_binary() -> bool {
-    // With sidecar (externalBin), the binary is bundled and managed by Tauri.
-    // We assume it's present if the build succeeded.
-    // Runtime errors during spawn will be handled by start_tagger.
-    true
-}
-
-fn spawn_tagger_sc(app: &AppHandle) -> Result<(), String> {
-    let state = app.state::<TaggerState>();
-    let mut child_guard = state.0.lock().map_err(|e| e.to_string())?;
-
-    if child_guard.is_some() {
-        return Ok(()); // Already running
-    }
-
-    // Use Tauri's sidecar API
-    let command = app
-        .shell()
-        .sidecar("tagger-server")
-        .map_err(|e| format!("Sidecar config error: {}", e))?;
-
-    let command = command.args(["--port", "8002"]);
-
-    let (_, child) = command
-        .spawn()
-        .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
-
-    *child_guard = Some(child);
-    Ok(())
-}
-
-#[tauri::command]
-async fn start_tagger(app: AppHandle) -> Result<(), String> {
-    spawn_tagger_sc(&app)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let tagger_state = TaggerState(Arc::new(Mutex::new(None)));
-    let tagger_state_clone = tagger_state.clone();
-
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
@@ -532,7 +487,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .manage(tagger_state)
         .invoke_handler(tauri::generate_handler![
             verify_token,
             get_anlas_balance,
@@ -546,8 +500,6 @@ pub fn run() {
             hide_embedded_browser,
             is_browser_open,
             zoom_embedded_browser,
-            start_tagger,
-            check_tagger_binary
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -558,8 +510,6 @@ pub fn run() {
                 )?;
             }
 
-            // Mac: Enable decorations for better performance
-            // Windows: Disable decorations for custom titlebar
             #[cfg(target_os = "macos")]
             {
                 if let Some(window) = app.get_webview_window("main") {
@@ -567,38 +517,9 @@ pub fn run() {
                 }
             }
 
-            // Auto-start tagger sidecar
-            if let Err(e) = spawn_tagger_sc(app.handle()) {
-                eprintln!("Failed to auto-start tagger: {}", e);
-            }
-
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(move |_app_handle, event| {
-            if let RunEvent::Exit = event {
-                if let Ok(mut child) = tagger_state_clone.0.lock() {
-                    if let Some(child_process) = child.take() {
-                        let _pid = child_process.pid();
-                        #[cfg(target_os = "windows")]
-                        {
-                            println!("Attempting to kill process tree for PID: {}", _pid);
-                            let _ = std::process::Command::new("taskkill")
-                                .args(["/F", "/T", "/PID", &_pid.to_string()])
-                                .output();
-
-                            // Safety net: Use taskkill by name to ensure it's dead
-                            let _ = std::process::Command::new("taskkill")
-                                .args(["/F", "/IM", "tagger-server.exe"])
-                                .output();
-                        }
-                        #[cfg(not(target_os = "windows"))]
-                        {
-                            let _ = child_process.kill();
-                        }
-                    }
-                }
-            }
-        });
+        .run(|_app_handle, _event| {});
 }

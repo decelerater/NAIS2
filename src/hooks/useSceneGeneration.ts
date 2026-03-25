@@ -21,9 +21,9 @@ export function useSceneGeneration() {
     const { token } = useAuthStore()
     const { savePath, useStreaming: streamingView } = useSettingsStore()
 
-    // Stores
-    const generationStore = useGenerationStore()
-    const characterPromptStore = useCharacterPromptStore()
+    // NOTE: Do NOT use useGenerationStore() hook here — it subscribes to ALL store
+    // changes (prompt typing, preview image, etc.) causing unnecessary re-renders.
+    // Use useGenerationStore.getState() inside processQueue instead.
 
     const {
         isGenerating,
@@ -59,8 +59,8 @@ export function useSceneGeneration() {
             const sceneState = useSceneStore.getState()
             if (sceneState.isCancelling || !isGenerating) {
                 // If scene generation stopped or cancelled, ensure global mode is cleared
-                if (generationStore.generatingMode === 'scene') {
-                    generationStore.setGeneratingMode(null)
+                if (useGenerationStore.getState().generatingMode === 'scene') {
+                    useGenerationStore.getState().setGeneratingMode(null)
                 }
                 setIsGenerating(false)  // This will also reset isCancelling
                 isProcessing = false
@@ -68,7 +68,7 @@ export function useSceneGeneration() {
             }
 
             // Conflict Check: If Main Mode is generating, stop Scene Mode
-            if (generationStore.generatingMode === 'main') {
+            if (useGenerationStore.getState().generatingMode === 'main') {
                 setIsGenerating(false)
                 isProcessing = false  // CRITICAL: Reset flag on early return
                 toast({
@@ -80,8 +80,8 @@ export function useSceneGeneration() {
             }
 
             // Set global mode to scene
-            if (generationStore.generatingMode !== 'scene') {
-                generationStore.setGeneratingMode('scene')
+            if (useGenerationStore.getState().generatingMode !== 'scene') {
+                useGenerationStore.getState().setGeneratingMode('scene')
             }
 
             if (!activePresetId || !token) {
@@ -101,11 +101,13 @@ export function useSceneGeneration() {
             if (!scene) {
                 setIsGenerating(false)
                 // Global mode will be cleared by the effect or next loop
-                generationStore.setGeneratingMode(null)
+                useGenerationStore.getState().setGeneratingMode(null)
 
                 // Reset progress
                 setGenerationProgress(0, 0)
                 isProcessing = false  // CRITICAL: Reset flag
+                // Release character/vibe base64 from memory after all scene generation completes
+                useCharacterStore.getState().releaseImageData()
                 toast({ title: t('generate.complete', '생성 완료'), description: t('generate.allComplete', '모든 예약된 작업이 완료되었습니다.'), variant: 'success' })
                 return
             }
@@ -145,7 +147,7 @@ export function useSceneGeneration() {
                 const latestCharStore = useCharacterStore.getState()
                 const characterImages = latestCharStore.characterImages.filter(img => img.enabled !== false && img.base64)
                 const vibeImages = latestCharStore.vibeImages.filter(img => img.enabled !== false && img.base64)
-                const { characters: characterPrompts } = characterPromptStore
+                const { characters: characterPrompts } = useCharacterPromptStore.getState()
 
                 // Apply fragment/wildcard substitution to character prompts (async)
                 const processedCharacterPrompts = await Promise.all(
@@ -316,9 +318,10 @@ export function useSceneGeneration() {
                             fullPath = await join(baseDir, presetSceneDir, fileName)
                         }
 
-                        // Notify HistoryPanel immediately with image data
+                        // Notify HistoryPanel immediately (file path only — no base64 needed,
+                        // HistoryPanel uses convertFileSrc for file-based images)
                         window.dispatchEvent(new CustomEvent('newImageGenerated', {
-                            detail: { path: fullPath, data: `data:${mimeType};base64,${result.imageData}` }
+                            detail: { path: fullPath }
                         }))
 
                         addImageToScene(activePresetId, scene.id, fullPath)
@@ -429,7 +432,7 @@ export function useSceneGeneration() {
             // Pass current session ID to processQueue
             processQueue(generationSessionId)
         }
-    }, [isGenerating, activePresetId, token, generationStore, characterPromptStore, savePath, t, addImageToScene, decrementFirstQueuedScene, setIsGenerating, streamingView, setStreamingData, initGenerationProgress, setGenerationProgress, completedCount, totalQueuedCount, generationSessionId])
+    }, [isGenerating, activePresetId, token, savePath, t, addImageToScene, decrementFirstQueuedScene, setIsGenerating, streamingView, setStreamingData, initGenerationProgress, setGenerationProgress, completedCount, totalQueuedCount, generationSessionId])
 
     // Reset processing when generation stops
     useEffect(() => {

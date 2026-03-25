@@ -1,16 +1,5 @@
-import { env } from '@xenova/transformers'
-import { invoke } from '@tauri-apps/api/core';
 // @ts-ignore
 import { Client } from "@gradio/client";
-
-// Configure to allow local models (optional) and control execution
-env.allowLocalModels = false;
-env.useBrowserCache = true;
-
-console.log("SmartTools: Configured transformers env", {
-    allowLocal: env.allowLocalModels,
-    useBrowserCache: env.useBrowserCache
-});
 
 export interface TagResult {
     label: string
@@ -18,11 +7,10 @@ export interface TagResult {
 }
 
 /**
- * Singleton class to manage Smart Tools (Transformer models)
+ * Singleton class to manage Smart Tools
  */
 class SmartToolsService {
     private static instance: SmartToolsService
-    private isServerReady = false;
 
     private constructor() { }
 
@@ -93,7 +81,6 @@ class SmartToolsService {
             const client = await Client.connect("briaai/BRIA-RMBG-2.0");
             const result = await client.predict("/image", { image: blob });
 
-            // Result can be at data[0][0] or data[1] depending on API version
             const outputData = (result.data as any[])?.[0]?.[0] || (result.data as any[])?.[1];
             if (outputData) {
                 return await this.processGradioOutput(outputData);
@@ -150,130 +137,6 @@ class SmartToolsService {
             reader.onerror = reject;
             reader.readAsDataURL(blob);
         });
-    }
-
-    /**
-     * Start Python Sidecar for local tagger server
-     */
-    public async startLocalServer() {
-        if (this.isServerReady) return;
-
-        console.log("SmartTools: Starting Local Server...");
-
-        try {
-            // Check if server is already running
-            const healthCheck = await fetch('http://127.0.0.1:8002/health');
-            if (healthCheck.ok) {
-                console.log("SmartTools: Server already running!");
-                this.isServerReady = true;
-                return;
-            }
-        } catch (e) {
-            // Not running
-        }
-
-        console.log("SmartTools: Invoking start_tagger command...");
-        try {
-            // Use backend to spawn and manage the process
-            await invoke('start_tagger');
-            console.log("SmartTools: Tagger sidecar started via backend");
-        } catch (e) {
-            console.error("SmartTools: Failed to start tagger sidecar:", e);
-            throw e;
-        }
-
-        // Wait for server to be ready
-        let retries = 0;
-        while (retries < 60) {
-            try {
-                const response = await fetch('http://127.0.0.1:8002/health');
-                if (response.ok) {
-                    console.log("SmartTools: Local Tagger Server is ready!");
-                    this.isServerReady = true;
-                    return;
-                }
-            } catch (e) {
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                retries++;
-            }
-        }
-
-        throw new Error("태그 분석 서버 시작 시간 초과");
-    }
-
-
-    /**
-     * Get current download status from Python sidecar
-     */
-    public async getDownloadStatus(): Promise<{
-        is_downloading: boolean;
-        model_name: string;
-        progress: number;
-        total: number;
-        percent: number;
-        message: string;
-    } | null> {
-        try {
-            const res = await fetch('http://127.0.0.1:8002/download-status');
-            if (res.ok) {
-                return await res.json();
-            }
-        } catch (e) {
-            // Server not ready yet
-        }
-        return null;
-    }
-
-    /**
-     * Check if Tagger binary exists
-     */
-    public async checkTaggerAvailable(): Promise<boolean> {
-        try {
-            return await invoke('check_tagger_binary');
-        } catch (e) {
-            console.warn("Failed to check tagger binary:", e);
-            return false;
-        }
-    }
-
-    /**
-     * Analyze tags using WD14 Tagger (Local Python Sidecar)
-     */
-    public async analyzeTags(
-        imageUrl: string,
-        _progressCallback?: (progress: number) => void
-    ): Promise<TagResult[]> {
-        console.log("SmartTools: Connecting to Local Python Tagger Sidecar...");
-
-        await this.startLocalServer();
-
-        try {
-            const response = await fetch(imageUrl);
-            const blob = await response.blob();
-
-            const formData = new FormData();
-            formData.append('file', blob);
-            formData.append('threshold', '0.35');
-
-            const apiRes = await fetch('http://127.0.0.1:8002/tag', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!apiRes.ok) throw new Error(`Server returned ${apiRes.status}`);
-
-            const data = await apiRes.json();
-            if (data.error) throw new Error(data.error);
-
-            return (data.tags || []).map((t: any) => ({
-                label: t.label,
-                score: t.score
-            }));
-
-        } catch (e) {
-            console.error("WD Tagger Local Error:", e);
-            throw new Error("Failed to connect to Local Tagger Server. Is Python installed?");
-        }
     }
 
     /**

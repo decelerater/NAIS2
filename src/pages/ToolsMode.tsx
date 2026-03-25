@@ -9,7 +9,7 @@ import { useGenerationStore } from '@/stores/generation-store'
 import { smartTools } from '@/services/smart-tools'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/use-toast'
-import { Eraser, Tags, Grid3X3, Wand2, Upload, RefreshCw, Download, X, Maximize2, Image as ImageIcon, Paintbrush, ImagePlus } from 'lucide-react'
+import { Eraser, Palette, Grid3X3, Wand2, Upload, RefreshCw, Download, X, Maximize2, Image as ImageIcon, Paintbrush, ImagePlus } from 'lucide-react'
 import { writeFile, BaseDirectory, exists, mkdir } from '@tauri-apps/plugin-fs'
 import { pictureDir, join } from '@tauri-apps/api/path'
 import { TagAnalysisDialog } from '@/components/tools/TagAnalysisDialog'
@@ -27,37 +27,13 @@ export default function ToolsMode() {
     const [processedImage, setProcessedImage] = useState<string | null>(activeImage)
     const [isLoading, setIsLoading] = useState(false)
 
-    // Tagger State
+    // Style Analysis State
     const [isAnalysisOpen, setIsAnalysisOpen] = useState(false)
 
     // Background Removal State
     const [isRembgOpen, setIsRembgOpen] = useState(false)
     const [rembgOriginal, setRembgOriginal] = useState<string | null>(null)
     const [rembgResult, setRembgResult] = useState<string | null>(null)
-
-    // Download Progress State
-    const [downloadStatus, setDownloadStatus] = useState<{
-        is_downloading: boolean
-        model_name: string
-        percent: number
-        message: string
-    } | null>(null)
-
-    // Poll download status during loading
-    useEffect(() => {
-        if (!isLoading) return
-
-        const interval = setInterval(async () => {
-            const status = await smartTools.getDownloadStatus()
-            if (status && status.is_downloading) {
-                setDownloadStatus(status)
-            } else {
-                setDownloadStatus(null)
-            }
-        }, 500)
-
-        return () => clearInterval(interval)
-    }, [isLoading])
 
 
     // Mosaic State
@@ -300,43 +276,18 @@ export default function ToolsMode() {
 
                         {isLoading && (
                             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center text-white z-10">
-                                {/* Pulsing Background Circle */}
                                 <div className="relative">
                                     <div className="absolute inset-0 w-20 h-20 rounded-full bg-primary/30 animate-ping" />
                                     <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center shadow-xl">
                                         <RefreshCw className="h-8 w-8 animate-spin" />
                                     </div>
                                 </div>
-
-                                {downloadStatus?.is_downloading ? (
-                                    <>
-                                        <div className="mt-6 text-lg font-semibold tracking-wide">
-                                            {t('smartTools.downloading', '모델 다운로드 중...')}
-                                        </div>
-                                        <div className="mt-2 text-sm text-white/80">
-                                            {downloadStatus.model_name}
-                                        </div>
-                                        {/* Progress Bar */}
-                                        <div className="mt-4 w-48 h-2 bg-white/20 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-primary transition-all duration-300 rounded-full"
-                                                style={{ width: `${downloadStatus.percent}%` }}
-                                            />
-                                        </div>
-                                        <div className="mt-2 text-sm font-medium">
-                                            {downloadStatus.percent}%
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="mt-6 text-lg font-semibold tracking-wide">
-                                            {t('smartTools.processing', '처리 중...')}
-                                        </div>
-                                        <div className="mt-2 text-sm text-white/60">
-                                            {t('smartTools.pleaseWait', '잠시만 기다려주세요')}
-                                        </div>
-                                    </>
-                                )}
+                                <div className="mt-6 text-lg font-semibold tracking-wide">
+                                    {t('smartTools.processing', '처리 중...')}
+                                </div>
+                                <div className="mt-2 text-sm text-white/60">
+                                    {t('smartTools.pleaseWait', '잠시만 기다려주세요')}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -400,11 +351,11 @@ export default function ToolsMode() {
                         </Button>
                     </ToolCard>
 
-                    {/* Combined Analysis Tool (Tag & Style) */}
+                    {/* Style Analysis (Kaloscope) */}
                     <ToolCard
-                        icon={Tags}
-                        color="text-blue-400"
-                        title={t('smartTools.smartAnalysis', 'Smart Tag & Style Analysis')}
+                        icon={Palette}
+                        color="text-purple-400"
+                        title={t('smartTools.kaloscopeStyle', '스타일 분석')}
                         disabled={!processedImage || isLoading}
                     >
                         <Button
@@ -413,7 +364,7 @@ export default function ToolsMode() {
                             onClick={() => setIsAnalysisOpen(true)}
                             disabled={!processedImage || isLoading}
                         >
-                            {t('smartTools.openAnalyzer', 'Open Tag & Style Analyzer')}
+                            {t('smartTools.runStyle', '스타일 분석 실행')}
                         </Button>
                     </ToolCard>
 

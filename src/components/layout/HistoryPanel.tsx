@@ -1,11 +1,10 @@
 import { useTranslation } from 'react-i18next'
-import { useEffect, useState, useRef, useCallback, memo } from 'react'
+import { useEffect, useState, useCallback, memo } from 'react'
 import { Clock, Trash2, FolderOpen, RefreshCw, FileSearch, Copy, RotateCcw, Save, Users, Image as ImageIcon, Paintbrush, Maximize2, Film, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useGenerationStore } from '@/stores/generation-store'
 import { useAuthStore } from '@/stores/auth-store'
 import { useSettingsStore } from '@/stores/settings-store'
-import { useSceneStore } from '@/stores/scene-store'
 import { readDir, readFile, remove, writeFile, mkdir, exists, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { pictureDir, join } from '@tauri-apps/api/path'
@@ -232,7 +231,6 @@ export function HistoryPanel() {
     // Inpainting dialog state
     const [inpaintDialogOpen, setInpaintDialogOpen] = useState(false)
     const [selectedImageForInpaint, setSelectedImageForInpaint] = useState<string | null>(null)
-    const prevIsGenerating = useRef(isGenerating)
     const navigate = useNavigate()
     const { setActiveImage } = useToolsStore()
 
@@ -532,26 +530,11 @@ export function HistoryPanel() {
         return () => window.removeEventListener('newImageGenerated', handler as EventListener)
     }, [addNewImage])
 
-    // Fallback auto-refresh when generation completes (if event wasn't fired)
-    useEffect(() => {
-        if (prevIsGenerating.current && !isGenerating) {
-            const timer = setTimeout(() => loadSavedImages(), 2000)
-            return () => clearTimeout(timer)
-        }
-        prevIsGenerating.current = isGenerating
-    }, [isGenerating])
-
-    // Auto-refresh when scene generates images (triggered by scene store)
-    const historyRefreshTrigger = useSceneStore(s => s.historyRefreshTrigger)
-    const prevTrigger = useRef(historyRefreshTrigger)
-    useEffect(() => {
-        if (prevTrigger.current !== historyRefreshTrigger && historyRefreshTrigger > 0) {
-            // Scene generation added an image, refresh after delay
-            const timer = setTimeout(() => loadSavedImages(), 1500)
-            prevTrigger.current = historyRefreshTrigger
-            return () => clearTimeout(timer)
-        }
-    }, [historyRefreshTrigger])
+    // PERFORMANCE: Removed auto-refresh after every generation.
+    // The newImageGenerated event (above) already adds images instantly.
+    // Full directory scan (loadSavedImages) is only needed on initial mount + manual refresh.
+    // For users generating 1000+ images, scanning the entire directory after EVERY generation
+    // was the #1 cause of progressive slowdown.
 
 
     const handleImageClick = async (image: SavedImage) => {

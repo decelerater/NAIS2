@@ -112,14 +112,126 @@ export function isDbInitFailed(): boolean {
 
 const OPERATION_TIMEOUT_MS = 5000 // 개별 작업 타임아웃
 
+// ============================================
+// Debounced Write System
+// Zustand persist calls setItem on EVERY state change.
+// Without debouncing, typing a single character triggers full JSON.stringify + IndexedDB write.
+// With thousands of scene images, each write serializes megabytes of data.
+// ============================================
+const WRITE_DEBOUNCE_MS: Record<string, number> = {
+    'nais2-scenes': 3000,           // Largest store (scene images), debounce aggressively
+    'nais2-generation': 1000,       // Prompt typing triggers frequent updates
+    'nais2-character-store': 1500,
+    'nais2-character-prompts': 1500,
+    'nais2-presets': 1500,
+    'nais2-wildcards': 2000,
+}
+const DEFAULT_WRITE_DEBOUNCE = 500
+const MAX_WRITE_INTERVAL = 10000   // Force write at least every 10 seconds even during rapid changes
+
+const pendingWriteTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const pendingWriteValues = new Map<string, string>()
+const lastWriteTime = new Map<string, number>()
+
+/** Write directly to IndexedDB (no debounce) */
+async function rawSetItem(name: string, value: string): Promise<void> {
+    if (dbInitFailed) return
+    try {
+        const db = await getDb()
+        return new Promise((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+                console.error(`[IndexedDB] setItem(${name}): Operation timed out`)
+                reject(new Error(`setItem timed out for key: ${name}`))
+            }, OPERATION_TIMEOUT_MS)
+
+            try {
+                const transaction = db.transaction(STORE_NAME, 'readwrite')
+
+                transaction.onerror = () => {
+                    clearTimeout(timeoutId)
+                    console.error(`[IndexedDB] setItem(${name}): Transaction error`, transaction.error)
+                    reject(transaction.error)
+                }
+
+                transaction.onabort = () => {
+                    clearTimeout(timeoutId)
+                    console.error(`[IndexedDB] setItem(${name}): Transaction aborted`)
+                    reject(new Error('Transaction aborted'))
+                }
+
+                transaction.oncomplete = () => {
+                    clearTimeout(timeoutId)
+                    resolve()
+                }
+
+                const store = transaction.objectStore(STORE_NAME)
+                const request = store.put(value, name)
+
+                request.onerror = () => {
+                    clearTimeout(timeoutId)
+                    console.error(`[IndexedDB] setItem(${name}): Request error`, request.error)
+                    reject(request.error)
+                }
+            } catch (err) {
+                clearTimeout(timeoutId)
+                throw err
+            }
+        })
+    } catch (err) {
+        console.error(`[IndexedDB] setItem(${name}): Failed`, err)
+    }
+}
+
+/** Flush a single pending write immediately */
+async function flushKey(name: string): Promise<void> {
+    const timer = pendingWriteTimers.get(name)
+    if (timer) {
+        clearTimeout(timer)
+        pendingWriteTimers.delete(name)
+    }
+    const value = pendingWriteValues.get(name)
+    if (value !== undefined) {
+        pendingWriteValues.delete(name)
+        lastWriteTime.set(name, Date.now())
+        await rawSetItem(name, value)
+    }
+}
+
+/** Flush ALL pending writes (called on app close) */
+export async function flushAllPendingWrites(): Promise<void> {
+    const keys = [...pendingWriteTimers.keys()]
+    for (const key of keys) {
+        await flushKey(key)
+    }
+}
+
+// Flush pending writes on app close
+if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+        for (const [name, timer] of pendingWriteTimers.entries()) {
+            clearTimeout(timer)
+            const val = pendingWriteValues.get(name)
+            if (val !== undefined) {
+                rawSetItem(name, val).catch(() => {})
+            }
+        }
+        pendingWriteTimers.clear()
+        pendingWriteValues.clear()
+    })
+}
+
 export const indexedDBStorage: StateStorage = {
     getItem: async (name: string): Promise<string | null> => {
+        // Return pending value if exists (debounced write hasn't flushed yet)
+        const pendingVal = pendingWriteValues.get(name)
+        if (pendingVal !== undefined) return pendingVal
+
         // DB 초기화 실패 시 null 반환 (데이터 손실 방지를 위해 에러 대신 null)
         if (dbInitFailed) {
             console.warn(`[IndexedDB] getItem(${name}): DB init failed, returning null`)
             return null
         }
-        
+
         try {
             const db = await getDb()
             return new Promise((resolve, reject) => {
@@ -127,30 +239,30 @@ export const indexedDBStorage: StateStorage = {
                     console.error(`[IndexedDB] getItem(${name}): Operation timed out`)
                     reject(new Error(`getItem timed out for key: ${name}`))
                 }, OPERATION_TIMEOUT_MS)
-                
+
                 try {
                     const transaction = db.transaction(STORE_NAME, 'readonly')
-                    
+
                     transaction.onerror = () => {
                         clearTimeout(timeoutId)
                         console.error(`[IndexedDB] getItem(${name}): Transaction error`, transaction.error)
                         reject(transaction.error)
                     }
-                    
+
                     transaction.onabort = () => {
                         clearTimeout(timeoutId)
                         console.error(`[IndexedDB] getItem(${name}): Transaction aborted`)
                         reject(new Error('Transaction aborted'))
                     }
-                    
+
                     const store = transaction.objectStore(STORE_NAME)
                     const request = store.get(name)
-                    
+
                     request.onsuccess = () => {
                         clearTimeout(timeoutId)
                         resolve(request.result as string || null)
                     }
-                    
+
                     request.onerror = () => {
                         clearTimeout(timeoutId)
                         console.error(`[IndexedDB] getItem(${name}): Request error`, request.error)
@@ -163,63 +275,54 @@ export const indexedDBStorage: StateStorage = {
             })
         } catch (err) {
             console.error(`[IndexedDB] getItem(${name}): Failed`, err)
-            // 읽기 실패 시 null 반환 - Zustand이 기본값 사용하도록
             return null
         }
     },
-    
+
     setItem: async (name: string, value: string): Promise<void> => {
-        // DB 초기화 실패 시 조용히 실패 (데이터는 메모리에만 유지)
         if (dbInitFailed) {
             console.warn(`[IndexedDB] setItem(${name}): DB init failed, skipping persist`)
             return
         }
-        
-        try {
-            const db = await getDb()
-            return new Promise((resolve, reject) => {
-                const timeoutId = setTimeout(() => {
-                    console.error(`[IndexedDB] setItem(${name}): Operation timed out`)
-                    reject(new Error(`setItem timed out for key: ${name}`))
-                }, OPERATION_TIMEOUT_MS)
-                
-                try {
-                    const transaction = db.transaction(STORE_NAME, 'readwrite')
-                    
-                    transaction.onerror = () => {
-                        clearTimeout(timeoutId)
-                        console.error(`[IndexedDB] setItem(${name}): Transaction error`, transaction.error)
-                        reject(transaction.error)
-                    }
-                    
-                    transaction.onabort = () => {
-                        clearTimeout(timeoutId)
-                        console.error(`[IndexedDB] setItem(${name}): Transaction aborted`)
-                        reject(new Error('Transaction aborted'))
-                    }
-                    
-                    transaction.oncomplete = () => {
-                        clearTimeout(timeoutId)
-                        resolve()
-                    }
-                    
-                    const store = transaction.objectStore(STORE_NAME)
-                    const request = store.put(value, name)
-                    
-                    request.onerror = () => {
-                        clearTimeout(timeoutId)
-                        console.error(`[IndexedDB] setItem(${name}): Request error`, request.error)
-                        reject(request.error)
-                    }
-                } catch (err) {
-                    clearTimeout(timeoutId)
-                    throw err
-                }
-            })
-        } catch (err) {
-            console.error(`[IndexedDB] setItem(${name}): Failed`, err)
-            // 쓰기 실패는 심각한 문제지만, 앱 크래시보다는 로그 남기고 계속
+
+        // Store latest value (always keep the newest)
+        pendingWriteValues.set(name, value)
+
+        // Clear existing debounce timer
+        const existingTimer = pendingWriteTimers.get(name)
+        if (existingTimer) clearTimeout(existingTimer)
+
+        // Check if we need to force-write (prevent starvation during rapid changes)
+        const lastWrite = lastWriteTime.get(name) ?? 0
+        const elapsed = Date.now() - lastWrite
+
+        if (elapsed >= MAX_WRITE_INTERVAL) {
+            // Too long since last write — flush immediately
+            pendingWriteTimers.delete(name)
+            const val = pendingWriteValues.get(name)!
+            pendingWriteValues.delete(name)
+            lastWriteTime.set(name, Date.now())
+            await rawSetItem(name, val)
+            return
         }
+
+        // Schedule debounced write
+        const debounceMs = WRITE_DEBOUNCE_MS[name] ?? DEFAULT_WRITE_DEBOUNCE
+        const timer = setTimeout(async () => {
+            pendingWriteTimers.delete(name)
+            const val = pendingWriteValues.get(name)
+            if (val !== undefined) {
+                pendingWriteValues.delete(name)
+                lastWriteTime.set(name, Date.now())
+                try {
+                    await rawSetItem(name, val)
+                } catch (err) {
+                    console.error(`[IndexedDB] Debounced write failed for ${name}:`, err)
+                }
+            }
+        }, debounceMs)
+
+        pendingWriteTimers.set(name, timer)
     },
     
     removeItem: async (name: string): Promise<void> => {

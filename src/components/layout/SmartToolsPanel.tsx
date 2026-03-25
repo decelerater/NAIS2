@@ -1,13 +1,12 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Eraser, Tags, Grid3X3, Copy, RefreshCw, Wand2 } from 'lucide-react'
+import { X, Eraser, Grid3X3, RefreshCw, Wand2, Palette, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/use-toast'
-import { Tip } from '@/components/ui/tooltip'
 import { smartTools, TagResult } from '@/services/smart-tools'
 
 
@@ -20,32 +19,18 @@ interface SmartToolsPanelProps {
 export function SmartToolsPanel({ imageUrl, onClose, onUpdateImage }: SmartToolsPanelProps) {
     const { t } = useTranslation()
     const [processedImage, setProcessedImage] = useState<string | null>(imageUrl)
-    const [activeTool, setActiveTool] = useState<'none' | 'mosaic' | 'rembg' | 'tagger'>('none')
+    const [activeTool, setActiveTool] = useState<'none' | 'mosaic' | 'rembg' | 'style'>('none')
     const [isLoading, setIsLoading] = useState(false)
     const [progress, setProgress] = useState(0)
 
-    // Tagger State
-    const [tags, setTags] = useState<TagResult[]>([])
+    // Style Analysis State
+    const [styleTags, setStyleTags] = useState<TagResult[]>([])
 
     // Mosaic State
     const [pixelSize, setPixelSize] = useState(10)
-    // Modals
-    const [isTaggerAvailable, setIsTaggerAvailable] = useState(false)
-    const [isCheckingTagger, setIsCheckingTagger] = useState(true)
 
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [isDrawing, setIsDrawing] = useState(false)
-
-    // Check availability on mount
-    useEffect(() => {
-        smartTools.checkTaggerAvailable().then(available => {
-            setIsTaggerAvailable(available)
-            setIsCheckingTagger(false)
-            if (!available) {
-                console.log("Tagger binary not found. Tag extraction disabled.")
-            }
-        })
-    }, [])
 
     // Update internal state when prop changes
     useEffect(() => {
@@ -71,34 +56,26 @@ export function SmartToolsPanel({ imageUrl, onClose, onUpdateImage }: SmartTools
         }
     }
 
-    // --- WD Tagger ---
-    const handleAnalyzeTags = async () => {
+    // --- Style Analysis (Kaloscope) ---
+    const handleAnalyzeStyle = async () => {
         if (!processedImage) return
-        setActiveTool('tagger')
+        setActiveTool('style')
         setIsLoading(true)
         setProgress(0)
         try {
-            const result = await smartTools.analyzeTags(processedImage, (p) => setProgress(Math.round(p * 100)))
-            // Filter and sort tags
-            const filtered = result.filter(r => r.score > 0.35).sort((a, b) => b.score - a.score)
-            setTags(filtered)
-            toast({ title: t('smartTools.taggingComplete', '태그 분석 완료'), variant: 'success' })
+            const result = await smartTools.analyzeStyle(processedImage, (p) => setProgress(Math.round(p * 100)))
+            const filtered = result.filter(r => r.score > 0.1).sort((a, b) => b.score - a.score)
+            setStyleTags(filtered)
+            toast({ title: t('smartTools.styleComplete', '스타일 분석 완료'), variant: 'success' })
         } catch (e) {
             console.error(e)
             toast({ title: t('smartTools.error', '작업 실패'), variant: 'destructive' })
         } finally {
             setIsLoading(false)
-            // Keep tool active to show tags
         }
     }
 
     // --- Mosaic Tool ---
-    // Simple canvas-based mosaic: click/drag to pixelate region
-    // Ideally we need an "Apply" flow. For now, let's do full image pixelate demo or region if complex.
-    // Let's implement full image pixelate toggle for simplicity first, or region if user wants.
-    // User asked "Mosaic function", usually implies obscuring parts.
-    // Implementing Region Mosaic:
-
     useEffect(() => {
         if (activeTool === 'mosaic' && processedImage && canvasRef.current) {
             const canvas = canvasRef.current
@@ -120,15 +97,12 @@ export function SmartToolsPanel({ imageUrl, onClose, onUpdateImage }: SmartTools
         const ctx = canvas?.getContext('2d')
         if (!canvas || !ctx) return
 
-        // Simple pixelate algo for a region around x,y
-        const regionSize = size // Size of brush
+        const regionSize = size
         const startX = Math.max(0, x - regionSize / 2)
         const startY = Math.max(0, y - regionSize / 2)
         const w = Math.min(canvas.width - startX, regionSize)
         const h = Math.min(canvas.height - startY, regionSize)
 
-        // Get data
-        // For true pixelate: subsample
         const sampleSize = pixelSize
 
         for (let py = startY; py < startY + h; py += sampleSize) {
@@ -220,28 +194,26 @@ export function SmartToolsPanel({ imageUrl, onClose, onUpdateImage }: SmartTools
                         </Button>
                     </div>
 
-                    {/* Tagger */}
+                    {/* Style Analysis (Kaloscope) */}
                     <div className="p-3 border rounded-lg bg-card hover:bg-muted/10 transition-colors">
                         <div className="flex items-center gap-3 mb-2">
-                            <Tags className="h-5 w-5 text-blue-400" />
-                            <span className="font-medium text-sm">{t('smartTools.tagger', '태그 분석')}</span>
+                            <Palette className="h-5 w-5 text-purple-400" />
+                            <span className="font-medium text-sm">{t('smartTools.kaloscopeStyle', '스타일 분석')}</span>
                         </div>
-                        <Tip content={!isTaggerAvailable ? "Tagger binary (tagger-server) not found in app directory." : undefined}>
-                            <Button
-                                className="w-full"
-                                variant="secondary"
-                                onClick={handleAnalyzeTags}
-                                disabled={isLoading || !processedImage || !isTaggerAvailable}
-                            >
-                                {isCheckingTagger ? "Checking..." : (isTaggerAvailable ? t('smartTools.runTagger', '태그 분석 실행') : t('smartTools.taggerUnavailable', '태그 실행 파일 없음'))}
-                            </Button>
-                        </Tip>
+                        <Button
+                            className="w-full"
+                            variant="secondary"
+                            onClick={handleAnalyzeStyle}
+                            disabled={isLoading || !processedImage}
+                        >
+                            {t('smartTools.runStyle', '스타일 분석 실행')}
+                        </Button>
 
-                        {/* Tags Display */}
-                        {tags.length > 0 && activeTool === 'tagger' && (
+                        {/* Style Tags Display */}
+                        {styleTags.length > 0 && activeTool === 'style' && (
                             <ScrollArea className="h-32 mt-3 rounded border bg-muted/30 p-2">
                                 <div className="flex flex-wrap gap-1">
-                                    {tags.map((tag, i) => (
+                                    {styleTags.map((tag, i) => (
                                         <Badge key={i} variant="outline" className="text-xs bg-background/50">
                                             {tag.label} <span className="text-[10px] opacity-50 ml-1">{(tag.score).toFixed(2)}</span>
                                         </Badge>
@@ -249,10 +221,10 @@ export function SmartToolsPanel({ imageUrl, onClose, onUpdateImage }: SmartTools
                                 </div>
                             </ScrollArea>
                         )}
-                        {tags.length > 0 && activeTool === 'tagger' && (
+                        {styleTags.length > 0 && activeTool === 'style' && (
                             <div className="flex gap-2 mt-2">
                                 <Button size="sm" variant="ghost" className="flex-1 text-xs" onClick={() => {
-                                    const tagStr = tags.map(t => t.label).join(', ')
+                                    const tagStr = styleTags.map(t => t.label).join(', ')
                                     navigator.clipboard.writeText(tagStr)
                                     toast({ title: 'Copied!' })
                                 }}>
