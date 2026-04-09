@@ -38,6 +38,7 @@ interface SceneState {
     addPreset: (name: string) => void
     deletePreset: (id: string) => void
     renamePreset: (id: string, name: string) => void
+    reorderPresets: (oldIndex: number, newIndex: number) => void
     setActivePreset: (id: string) => void
     getActivePreset: () => ScenePreset | undefined
 
@@ -173,6 +174,15 @@ export const useSceneStore = create<SceneState>()(
                         p.id === id ? { ...p, name } : p
                     ),
                 }))
+            },
+
+            reorderPresets: (oldIndex, newIndex) => {
+                set(state => {
+                    const newPresets = [...state.presets]
+                    const [removed] = newPresets.splice(oldIndex, 1)
+                    newPresets.splice(newIndex, 0, removed)
+                    return { presets: newPresets }
+                })
             },
 
             setActivePreset: (id) => set({ activePresetId: id }),

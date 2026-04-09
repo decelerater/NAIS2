@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from '@/components/ui/use-toast'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeFile, remove, readFile } from '@tauri-apps/plugin-fs'
-import { Command } from '@tauri-apps/plugin-shell'
+import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { useNavigate } from 'react-router-dom'
 import { useToolsStore } from '@/stores/tools-store'
 
@@ -79,7 +79,7 @@ export function LibraryContextMenu({ item, children, onRename, onAddRef, onLoadM
 
     const handleOpenFolder = async () => {
         try {
-            await Command.create('explorer', ['/select,', item.path]).execute()
+            await revealItemInDir(item.path)
         } catch (e) {
             console.error('Failed to open folder:', e)
         }

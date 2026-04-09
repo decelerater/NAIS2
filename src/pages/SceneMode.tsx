@@ -21,7 +21,8 @@ import {
     useSortable,
     rectSortingStrategy,
 } from '@dnd-kit/sortable'
-import { snapCenterToCursor } from '@dnd-kit/modifiers'
+import { snapCenterToCursor, restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers'
+import { verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -70,6 +71,8 @@ import {
     LayoutList,
     Star,
     ImageOff,
+    GripVertical,
+    ArrowUpDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tip } from '@/components/ui/tooltip'
@@ -80,6 +83,13 @@ import { convertFileSrc } from '@tauri-apps/api/core'
 import { writeFile } from '@tauri-apps/plugin-fs'
 import { save } from '@tauri-apps/plugin-dialog'
 import { ExportDialog } from '@/components/scene/ExportDialog'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog'
 import { ResolutionSelector, Resolution } from '@/components/ui/ResolutionSelector'
 
 const dropAnimation = {
@@ -90,6 +100,88 @@ const dropAnimation = {
             },
         },
     }),
+}
+
+// --- Scene Preset Reorder Dialog ---
+function SortablePresetRow({ preset, isActive, listeners, attributes, setNodeRef, style, isDragging, t }: any) {
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={cn(
+                "flex items-center gap-2 px-3 py-2.5 rounded-lg transition-colors",
+                isActive ? "bg-primary/10 border border-primary/30" : "bg-muted/30 border border-transparent",
+                isDragging && "shadow-lg opacity-50"
+            )}
+        >
+            <div
+                {...attributes}
+                {...listeners}
+                className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+            >
+                <GripVertical className="h-4 w-4" />
+            </div>
+            <span className="flex-1 text-sm font-medium truncate">
+                {preset.id === 'scene-default' ? t('scene.presetDefault', '기본') : preset.name}
+            </span>
+            <span className="text-xs text-muted-foreground">{preset.scenes.length}</span>
+            {isActive && (
+                <span className="text-[10px] text-primary font-medium px-1.5 py-0.5 bg-primary/10 rounded">
+                    {t('preset.active', '활성')}
+                </span>
+            )}
+        </div>
+    )
+}
+
+function SortablePresetWrapper({ preset, isActive, t }: any) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: preset.id })
+    const style = { transform: CSS.Transform.toString(transform), transition }
+    return <SortablePresetRow preset={preset} isActive={isActive} listeners={listeners} attributes={attributes} setNodeRef={setNodeRef} style={style} isDragging={isDragging} t={t} />
+}
+
+function ScenePresetReorderDialog({ presets, activePresetId, onReorder, t }: {
+    presets: any[], activePresetId: string | null, onReorder: (oldIndex: number, newIndex: number) => void, t: any
+}) {
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    )
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event
+        if (over && active.id !== over.id) {
+            const oldIndex = presets.findIndex(p => p.id === active.id)
+            const newIndex = presets.findIndex(p => p.id === over.id)
+            onReorder(oldIndex, newIndex)
+        }
+    }
+
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="shrink-0 rounded-lg h-8 w-8 hover:bg-white/10 text-muted-foreground">
+                    <Tip content={t('scene.reorderPresets', '프리셋 순서 편집')}>
+                        <ArrowUpDown className="h-4 w-4" />
+                    </Tip>
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>{t('scene.reorderPresets', '프리셋 순서 편집')}</DialogTitle>
+                </DialogHeader>
+                <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragEnd={handleDragEnd} modifiers={[restrictToVerticalAxis, restrictToParentElement]}>
+                    <SortableContext items={presets.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                        <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+                            {presets.map(preset => (
+                                <SortablePresetWrapper key={preset.id} preset={preset} isActive={activePresetId === preset.id} t={t} />
+                            ))}
+                        </div>
+                    </SortableContext>
+                </DndContext>
+            </DialogContent>
+        </Dialog>
+    )
 }
 
 export default function SceneMode() {
@@ -118,6 +210,7 @@ export default function SceneMode() {
     const addScene = useSceneStore(s => s.addScene)
     const renamePreset = useSceneStore(s => s.renamePreset)
     const reorderScenes = useSceneStore(s => s.reorderScenes)
+    const reorderPresets = useSceneStore(s => s.reorderPresets)
     const isGenerating = useSceneStore(s => s.isGenerating)
     const importPreset = useSceneStore(s => s.importPreset)
 
@@ -661,6 +754,14 @@ export default function SceneMode() {
                                 </Button>
                             </Tip>
                         </div>
+                    )}
+                    {presets.length > 1 && (
+                        <ScenePresetReorderDialog
+                            presets={presets}
+                            activePresetId={activePresetId}
+                            onReorder={reorderPresets}
+                            t={t}
+                        />
                     )}
                 </div>
 

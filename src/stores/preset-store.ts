@@ -69,6 +69,7 @@ interface PresetState {
 
     // Actions
     addPreset: (name: string) => void
+    duplicatePreset: (id: string) => void
     deletePreset: (id: string) => void
     syncFromGenerationStore: () => void
     loadPreset: (id: string) => void
@@ -133,6 +134,30 @@ export const usePresetStore = create<PresetState>()(
                 genStore.setQualityToggle(true)
                 genStore.setUcPreset(0)
                 genStore.setSelectedResolution({ label: 'Portrait', width: 832, height: 1216 })
+            },
+
+            duplicatePreset: (id) => {
+                // First sync current state to active preset
+                get().syncFromGenerationStore()
+
+                const source = get().presets.find(p => p.id === id)
+                if (!source) return
+
+                const newPreset: Preset = {
+                    ...source,
+                    id: Date.now().toString(),
+                    name: `${source.isDefault ? '기본' : source.name} (복사)`,
+                    createdAt: Date.now(),
+                    isDefault: undefined,
+                }
+
+                set(state => ({
+                    presets: [...state.presets, newPreset],
+                    activePresetId: newPreset.id
+                }))
+
+                // Apply duplicated preset to generation store
+                useGenerationStore.getState().applyPreset(newPreset)
             },
 
             deletePreset: (id) => {

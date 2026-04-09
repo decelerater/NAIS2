@@ -1,4 +1,4 @@
-import React, { useRef } from 'react'
+import React, { useRef, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
     Dialog,
@@ -113,6 +113,50 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
         // Reset input
         e.target.value = ''
     }
+
+    const [charDragOver, setCharDragOver] = useState(false)
+    const [vibeDragOver, setVibeDragOver] = useState(false)
+
+    const handleDrop = useCallback(async (e: React.DragEvent, mode: 'character' | 'vibe') => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (mode === 'character') setCharDragOver(false)
+        else setVibeDragOver(false)
+
+        const files = e.dataTransfer.files
+        if (!files || files.length === 0) return
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i]
+            if (!file.type.startsWith('image/')) continue
+            const base64 = await convertToBase64(file)
+            if (mode === 'character') {
+                await addCharacterImage(base64)
+            } else {
+                try {
+                    const metadata = await parseMetadataFromBase64(base64)
+                    if (metadata?.encodedVibes && metadata.encodedVibes.length > 0) {
+                        const info = metadata.vibeTransferInfo?.[0]
+                        await addVibeImage(
+                            base64,
+                            metadata.encodedVibes[0],
+                            info?.informationExtracted ?? 1.0,
+                            info?.strength ?? 0.6
+                        )
+                    } else {
+                        await addVibeImage(base64)
+                    }
+                } catch {
+                    await addVibeImage(base64)
+                }
+            }
+        }
+    }, [addCharacterImage, addVibeImage])
+
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+    }, [])
 
     const convertToBase64 = (file: File): Promise<string> => {
         return new Promise((resolve, reject) => {
@@ -369,11 +413,22 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
                     <TabsContent value="character" className="flex-1 overflow-y-auto min-h-0 pr-1">
                         <div className="py-2">
                             <div
-                                className="border-2 border-dashed border-muted-foreground/25 rounded-xl p-4 text-center hover:bg-muted/50 transition-colors cursor-pointer mb-4"
+                                className={cn(
+                                    "border-2 border-dashed rounded-xl p-4 text-center transition-colors cursor-pointer mb-4",
+                                    charDragOver
+                                        ? "border-primary bg-primary/10"
+                                        : "border-muted-foreground/25 hover:bg-muted/50"
+                                )}
                                 onClick={() => charInputRef.current?.click()}
+                                onDragOver={handleDragOver}
+                                onDragEnter={(e) => { e.preventDefault(); setCharDragOver(true) }}
+                                onDragLeave={() => setCharDragOver(false)}
+                                onDrop={(e) => handleDrop(e, 'character')}
                             >
-                                <Upload className="w-6 h-6 mx-auto mb-1 text-muted-foreground" />
-                                <p className="text-sm text-muted-foreground font-medium">{t('characterDialog.uploadCharacter')}</p>
+                                <Upload className={cn("w-6 h-6 mx-auto mb-1", charDragOver ? "text-primary" : "text-muted-foreground")} />
+                                <p className={cn("text-sm font-medium", charDragOver ? "text-primary" : "text-muted-foreground")}>
+                                    {charDragOver ? t('characterDialog.dropHere', '여기에 놓기') : t('characterDialog.uploadCharacter')}
+                                </p>
                             </div>
                             <input
                                 type="file"
@@ -404,11 +459,22 @@ export function CharacterSettingsDialog({ open, onOpenChange }: { open?: boolean
                         <div className={characterImages.some(img => img.enabled !== false) ? "opacity-30 pointer-events-none grayscale filter blur-[1px]" : ""}>
                             <div className="py-2">
                                 <div
-                                    className="border-2 border-dashed border-muted-foreground/25 rounded-xl p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer"
+                                    className={cn(
+                                        "border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer",
+                                        vibeDragOver
+                                            ? "border-primary bg-primary/10"
+                                            : "border-muted-foreground/25 hover:bg-muted/50"
+                                    )}
                                     onClick={() => vibeInputRef.current?.click()}
+                                    onDragOver={handleDragOver}
+                                    onDragEnter={(e) => { e.preventDefault(); setVibeDragOver(true) }}
+                                    onDragLeave={() => setVibeDragOver(false)}
+                                    onDrop={(e) => handleDrop(e, 'vibe')}
                                 >
-                                    <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                                    <p className="text-sm text-muted-foreground font-medium">{t('characterDialog.uploadVibe')}</p>
+                                    <Upload className={cn("w-8 h-8 mx-auto mb-2", vibeDragOver ? "text-primary" : "text-muted-foreground")} />
+                                    <p className={cn("text-sm font-medium", vibeDragOver ? "text-primary" : "text-muted-foreground")}>
+                                        {vibeDragOver ? t('characterDialog.dropHere', '여기에 놓기') : t('characterDialog.uploadVibe')}
+                                    </p>
                                 </div>
                                 <input
                                     type="file"

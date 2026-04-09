@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2, Pencil, Check, X, FolderOpen, GripVertical } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X, FolderOpen, GripVertical, Copy } from 'lucide-react'
 import {
     Dialog,
     DialogContent,
@@ -47,6 +47,7 @@ interface SortablePresetItemProps {
     editName: string
     onSelect: () => void
     onStartEdit: (e: React.MouseEvent) => void
+    onDuplicate: (e: React.MouseEvent) => void
     onDelete: (e: React.MouseEvent) => void
     onRename: () => void
     onCancelEdit: () => void
@@ -61,6 +62,7 @@ function SortablePresetItem({
     editName,
     onSelect,
     onStartEdit,
+    onDuplicate,
     onDelete,
     onRename,
     onCancelEdit,
@@ -150,26 +152,37 @@ function SortablePresetItem({
                             {t('preset.active', '활성')}
                         </span>
                     )}
-                    {!preset.isDefault && (
-                        <div className="flex items-center gap-0.5">
-                            <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6"
-                                onClick={onStartEdit}
-                            >
-                                <Pencil className="h-3 w-3" />
-                            </Button>
-                            <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 text-destructive hover:text-destructive"
-                                onClick={onDelete}
-                            >
-                                <Trash2 className="h-3 w-3" />
-                            </Button>
-                        </div>
-                    )}
+                    <div className="flex items-center gap-0.5">
+                        <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6"
+                            onClick={onDuplicate}
+                            title={t('preset.duplicate', '복사')}
+                        >
+                            <Copy className="h-3 w-3" />
+                        </Button>
+                        {!preset.isDefault && (
+                            <>
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6"
+                                    onClick={onStartEdit}
+                                >
+                                    <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 text-destructive hover:text-destructive"
+                                    onClick={onDelete}
+                                >
+                                    <Trash2 className="h-3 w-3" />
+                                </Button>
+                            </>
+                        )}
+                    </div>
                 </>
             )}
         </div>
@@ -182,6 +195,7 @@ function PresetDialogContent({ open: externalOpen, onOpenChange: externalOnOpenC
         presets,
         activePresetId,
         addPreset,
+        duplicatePreset,
         deletePreset,
         loadPreset,
         renamePreset,
@@ -292,6 +306,10 @@ function PresetDialogContent({ open: externalOpen, onOpenChange: externalOnOpenC
                                     editName={editName}
                                     onSelect={() => handleSelect(preset.id)}
                                     onStartEdit={(e) => startEdit(preset.id, preset.name, e)}
+                                    onDuplicate={(e) => {
+                                        e.stopPropagation()
+                                        duplicatePreset(preset.id)
+                                    }}
                                     onDelete={(e) => {
                                         e.stopPropagation()
                                         deletePreset(preset.id)

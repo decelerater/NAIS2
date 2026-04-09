@@ -8,7 +8,7 @@ import { useSettingsStore } from '@/stores/settings-store'
 import { readDir, readFile, remove, writeFile, mkdir, exists, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { pictureDir, join } from '@tauri-apps/api/path'
-import { Command } from '@tauri-apps/plugin-shell'
+import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { save } from '@tauri-apps/plugin-dialog'
 import { MetadataDialog } from '@/components/metadata/MetadataDialog'
 import { ImageReferenceDialog } from '@/components/metadata/ImageReferenceDialog'
@@ -802,7 +802,7 @@ export function HistoryPanel() {
     const handleOpenFolder = async (image: SavedImage) => {
         if (image.isTemporary) return
         try {
-            await Command.create('explorer', ['/select,', image.path]).execute()
+            await revealItemInDir(image.path)
         } catch (e) {
             console.error('Failed to open folder:', e)
         }
