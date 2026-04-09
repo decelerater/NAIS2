@@ -419,14 +419,13 @@ export async function generateImage(
             }
         }
 
-        // Build API parameters - matching NAIS1 working format
+        // Build API parameters - matching NAI official format
         const apiParameters = {
             // Core parameters
             width: params.width,
             height: params.height,
             n_samples: 1,
             seed: params.seed,
-            extra_noise_seed: params.seed,
             sampler: params.sampler,
             steps: params.steps,
             scale: params.cfg_scale,
@@ -465,10 +464,12 @@ export async function generateImage(
             deliberate_euler_ancestral_bug: false,
             image_format: 'png',
 
-            // Reference/Vibe Transfer
-            reference_image_multiple: processedVibeImages,
-            reference_information_extracted_multiple: params.vibeInfo || [],
-            reference_strength_multiple: params.vibeStrength || [],
+            // Reference/Vibe Transfer (only include when vibes exist)
+            ...(processedVibeImages.length > 0 ? {
+                reference_image_multiple: processedVibeImages,
+                reference_information_extracted_multiple: params.vibeInfo || [],
+                reference_strength_multiple: params.vibeStrength || [],
+            } : {}),
 
             // Precise Reference (Director tools) - 2026년 2월 업데이트
             // - information_extracted: 항상 1
@@ -514,6 +515,7 @@ export async function generateImage(
                     base_caption: removeComments(params.negative_prompt),
                     char_captions: [] as { char_caption: string, centers: { x: number, y: number }[] }[],
                 },
+                legacy_uc: false,
             },
         }
 
@@ -555,11 +557,6 @@ export async function generateImage(
                     center: { x: c.position.x, y: c.position.y },
                     enabled: true
                 }))
-        }
-
-        if (processedVibeImages.length > 1) {
-            // @ts-ignore
-            apiParameters.normalize_reference_strength_multiple = true
         }
 
         // Determine action type based on params
@@ -801,13 +798,12 @@ export async function generateImageStream(
         const requestModel = params.model
         let action = 'generate'
 
-        // Base API Parameters (Common)
+        // Base API Parameters (Common) - matching NAI official format
         const apiParameters: Record<string, any> = {
             width: params.width,
             height: params.height,
             n_samples: 1,
             seed: params.seed,
-            extra_noise_seed: params.seed,
             sampler: params.sampler,
             steps: params.steps,
             scale: params.cfg_scale,
@@ -849,10 +845,12 @@ export async function generateImageStream(
             deliberate_euler_ancestral_bug: false,
             image_format: params.imageFormat ?? 'png',
 
-            // Reference/Vibe Transfer
-            reference_image_multiple: processedVibeImages,
-            reference_information_extracted_multiple: params.vibeInfo || [],
-            reference_strength_multiple: params.vibeStrength || [],
+            // Reference/Vibe Transfer (only include when vibes exist)
+            ...(processedVibeImages.length > 0 ? {
+                reference_image_multiple: processedVibeImages,
+                reference_information_extracted_multiple: params.vibeInfo || [],
+                reference_strength_multiple: params.vibeStrength || [],
+            } : {}),
 
             // V4 prompt format initialization (with comments removed)
             v4_prompt: {
@@ -868,6 +866,7 @@ export async function generateImageStream(
                     base_caption: removeComments(params.negative_prompt),
                     char_captions: [] as { char_caption: string, centers: { x: number, y: number }[] }[],
                 },
+                legacy_uc: false,
             },
         }
 
