@@ -700,22 +700,50 @@ export async function augmentImage(
 ): Promise<{ success: boolean; imageData?: string; error?: string }> {
     try {
         const rawBase64 = stripBase64Header(imageBase64)
-        const { invoke } = await import('@tauri-apps/api/core')
-        const result = await invoke<{ success: boolean; image_data?: string; error?: string }>('augment_image', {
-            token: token.trim(),
+
+        const payload: Record<string, any> = {
             image: rawBase64,
             width,
             height,
-            reqType,
-            defry: defry ?? null,
-            prompt: prompt ?? null,
-        })
-        return {
-            success: result.success,
-            imageData: result.image_data,
-            error: result.error,
+            req_type: reqType,
         }
+
+        // Only add defry/prompt for colorize and emotion
+        if (reqType === 'colorize' || reqType === 'emotion') {
+            payload.defry = defry ?? 0
+            payload.prompt = prompt || ''
+        }
+
+        const response = await CLIENT_FETCH('https://image.novelai.net/ai/augment-image', {
+            method: 'POST',
+            headers: {
+                ...DEFAULT_HEADERS,
+                'Authorization': `Bearer ${token.trim()}`,
+            },
+            body: JSON.stringify(payload),
+        })
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            console.error('[Augment] API Error:', response.status, errorText)
+            return { success: false, error: `API 오류 ${response.status}: ${errorText}` }
+        }
+
+        // Response is a ZIP file containing the image
+        const zipBlob = await response.blob()
+        const zipData = await zipBlob.arrayBuffer()
+        const JSZip = (await import('jszip')).default
+        const zip = await JSZip.loadAsync(zipData)
+        const files = Object.keys(zip.files)
+
+        if (files.length === 0) {
+            return { success: false, error: 'ZIP 파일이 비어있습니다' }
+        }
+
+        const imageFile = await zip.files[files[0]].async('base64')
+        return { success: true, imageData: imageFile }
     } catch (error) {
+        console.error('[Augment] Error:', error)
         return { success: false, error: `Augment error: ${error}` }
     }
 }

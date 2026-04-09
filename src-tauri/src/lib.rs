@@ -271,7 +271,8 @@ async fn augment_image(
     image: String,
     width: i32,
     height: i32,
-    req_type: String,
+    #[allow(non_snake_case)]
+    reqType: String,
     defry: Option<i32>,
     prompt: Option<String>,
 ) -> UpscaleResult {
@@ -281,7 +282,7 @@ async fn augment_image(
         image,
         width,
         height,
-        req_type,
+        req_type: reqType,
         defry,
         prompt,
     };
