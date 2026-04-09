@@ -484,11 +484,13 @@ export function AutocompleteTextarea({
                     font-variant-ligatures: none !important;
                     tab-size: 4 !important;
                     white-space: pre-wrap !important;
-                    word-break: break-word !important;
+                    overflow-wrap: break-word !important;
+                    word-break: normal !important;
                     box-sizing: border-box !important;
                 }
                 .prompt-editor-wrapper textarea {
-                    overflow: hidden !important; /* Hide native scrollbar since container scrolls */
+                    overflow: hidden !important;
+                    height: 100% !important; /* Prevent internal scroll by matching container height */
                 }
             `}</style>
 
