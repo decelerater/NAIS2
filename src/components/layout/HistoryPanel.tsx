@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useEffect, useState, useCallback, memo } from 'react'
-import { Clock, Trash2, FolderOpen, RefreshCw, FileSearch, Copy, RotateCcw, Save, Users, Image as ImageIcon, Paintbrush, Maximize2, Film, Zap } from 'lucide-react'
+import { Clock, Trash2, FolderOpen, RefreshCw, FileSearch, Copy, RotateCcw, Save, Users, Image as ImageIcon, Paintbrush, Maximize2, Film, Zap, PenTool, Pencil, Droplets, Smile, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useGenerationStore } from '@/stores/generation-store'
 import { useAuthStore } from '@/stores/auth-store'
@@ -42,7 +42,7 @@ interface SavedImage {
     name: string
     path: string
     timestamp: number
-    type: 'main' | 'i2i' | 'inpaint' | 'upscale' | 'scene'
+    type: 'main' | 'i2i' | 'inpaint' | 'upscale' | 'scene' | 'lineart' | 'sketch' | 'colorize' | 'emotion' | 'declutter'
     isTemporary?: boolean
 }
 
@@ -51,7 +51,7 @@ interface HistoryImageItemProps {
     image: SavedImage
     thumbnail?: string
     index: number
-    getTypeIcon: (type: 'main' | 'i2i' | 'inpaint' | 'upscale' | 'scene') => React.ReactNode
+    getTypeIcon: (type: SavedImage['type']) => React.ReactNode
     onImageClick: (image: SavedImage) => void
     onDelete: (image: SavedImage, e?: React.MouseEvent) => void
     onSaveAs: (image: SavedImage) => void
@@ -276,7 +276,12 @@ export function HistoryPanel() {
             type: imagePath.includes('NAIS_Scene') ? 'scene' :
                 name.includes('INPAINT_') ? 'inpaint' :
                     name.includes('I2I_') ? 'i2i' :
-                        name.includes('UPSCALE_') ? 'upscale' : 'main',
+                        name.includes('UPSCALE_') ? 'upscale' :
+                            name.includes('LINEART_') ? 'lineart' :
+                                name.includes('SKETCH_') ? 'sketch' :
+                                    name.includes('COLORIZE_') ? 'colorize' :
+                                        name.includes('EMOTION_') ? 'emotion' :
+                                            name.includes('DECLUTTER_') ? 'declutter' : 'main',
             isTemporary
         }
 
@@ -314,21 +319,31 @@ export function HistoryPanel() {
         })
     }, [])
 
-    const getGenerationType = (name: string): 'main' | 'i2i' | 'inpaint' | 'upscale' | 'scene' => {
+    const getGenerationType = (name: string): SavedImage['type'] => {
         if (name.includes('INPAINT_')) return 'inpaint'
         if (name.includes('I2I_')) return 'i2i'
         if (name.includes('UPSCALE_')) return 'upscale'
         if (name.includes('SCENE_')) return 'scene'
+        if (name.includes('LINEART_')) return 'lineart'
+        if (name.includes('SKETCH_')) return 'sketch'
+        if (name.includes('COLORIZE_')) return 'colorize'
+        if (name.includes('EMOTION_')) return 'emotion'
+        if (name.includes('DECLUTTER_')) return 'declutter'
         return 'main'
     }
 
     // Get icon component for generation type
-    const getTypeIcon = (type: 'main' | 'i2i' | 'inpaint' | 'upscale' | 'scene') => {
+    const getTypeIcon = (type: SavedImage['type']) => {
         switch (type) {
             case 'i2i': return <ImageIcon className="h-3 w-3 text-indigo-400" />
             case 'inpaint': return <Paintbrush className="h-3 w-3 text-pink-400" />
             case 'upscale': return <Maximize2 className="h-3 w-3 text-purple-400" />
             case 'scene': return <Film className="h-3 w-3 text-emerald-400" />
+            case 'lineart': return <PenTool className="h-3 w-3 text-slate-400" />
+            case 'sketch': return <Pencil className="h-3 w-3 text-gray-400" />
+            case 'colorize': return <Droplets className="h-3 w-3 text-cyan-400" />
+            case 'emotion': return <Smile className="h-3 w-3 text-yellow-400" />
+            case 'declutter': return <Sparkles className="h-3 w-3 text-emerald-400" />
             default: return <ImageIcon className="h-3 w-3 text-amber-500" />
         }
     }

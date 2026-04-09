@@ -202,6 +202,40 @@ export default function ToolsMode() {
         setIsLoading(true)
         try {
             const result = await smartTools.directorTool(processedImage, token, reqType, options)
+
+            // Save to disk
+            const { savePath, useAbsolutePath } = useSettingsStore.getState()
+            const outputDir = savePath || 'NAIS_Output'
+            const label = reqType.toUpperCase().replace('-', '_')
+            const fileName = `NAIS_${label}_${Date.now()}.png`
+
+            try {
+                const base64Data = result.replace(/^data:image\/\w+;base64,/, '')
+                const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
+
+                let fullPath: string
+
+                if (useAbsolutePath) {
+                    const dirExists = await exists(outputDir)
+                    if (!dirExists) await mkdir(outputDir, { recursive: true })
+                    fullPath = await join(outputDir, fileName)
+                    await writeFile(fullPath, binaryData)
+                } else {
+                    const dirExists = await exists(outputDir, { baseDir: BaseDirectory.Picture })
+                    if (!dirExists) await mkdir(outputDir, { baseDir: BaseDirectory.Picture })
+                    await writeFile(`${outputDir}/${fileName}`, binaryData, { baseDir: BaseDirectory.Picture })
+                    const picPath = await pictureDir()
+                    fullPath = await join(picPath, outputDir, fileName)
+                }
+
+                // Dispatch for instant history update
+                window.dispatchEvent(new CustomEvent('newImageGenerated', {
+                    detail: { path: fullPath, data: result }
+                }))
+            } catch (e) {
+                console.warn('Failed to save director tool image:', e)
+            }
+
             setActiveImage(result)
             toast({ title: t('smartTools.directorComplete', '처리 완료'), variant: 'success' })
         } catch (e) {
@@ -473,14 +507,6 @@ export default function ToolsMode() {
                             {t('smartTools.startUpscale', '4배 업스케일 시작')}
                         </Button>
                     </ToolCard>
-
-                    {/* Separator */}
-                    <div className="border-t border-border pt-2">
-                        <p className="text-xs text-muted-foreground font-medium mb-3">
-                            {t('smartTools.directorTools', 'Director Tools')}
-                            <span className="text-orange-400 ml-2">NAI API</span>
-                        </p>
-                    </div>
 
                     {/* Line Art */}
                     <ToolCard

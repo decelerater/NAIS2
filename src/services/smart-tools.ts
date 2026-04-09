@@ -144,12 +144,20 @@ class SmartToolsService {
      * Supports: bg-removal, lineart, sketch, colorize, emotion, declutter
      */
     public async directorTool(
-        imageBase64: string,
+        imageInput: string,
         token: string,
         reqType: 'bg-removal' | 'lineart' | 'sketch' | 'colorize' | 'emotion' | 'declutter',
         options?: { defry?: number; prompt?: string; emotion?: string }
     ): Promise<string> {
         const { augmentImage } = await import('@/services/novelai-api')
+
+        // Convert URL to base64 data URL if needed
+        let imageBase64 = imageInput
+        if (!imageInput.startsWith('data:')) {
+            const response = await fetch(imageInput)
+            const blob = await response.blob()
+            imageBase64 = await this.blobToDataUrl(blob)
+        }
 
         const img = new Image()
         await new Promise<void>((resolve, reject) => {
@@ -187,8 +195,16 @@ class SmartToolsService {
     /**
      * Upscale image using NovelAI's upscale API (4x)
      */
-    public async upscale(imageBase64: string, token: string): Promise<string> {
+    public async upscale(imageInput: string, token: string): Promise<string> {
         const { upscaleImage } = await import('@/services/novelai-api')
+
+        // Convert URL to base64 data URL if needed
+        let imageBase64 = imageInput
+        if (!imageInput.startsWith('data:')) {
+            const response = await fetch(imageInput)
+            const blob = await response.blob()
+            imageBase64 = await this.blobToDataUrl(blob)
+        }
 
         const img = new Image()
         await new Promise<void>((resolve, reject) => {
@@ -199,7 +215,6 @@ class SmartToolsService {
 
         const width = img.width
         const height = img.height
-        // MEMORY: Clear image reference after getting dimensions
         img.src = ''
 
         const result = await upscaleImage(token, imageBase64, width, height)

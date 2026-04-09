@@ -702,7 +702,7 @@ export async function augmentImage(
         const rawBase64 = stripBase64Header(imageBase64)
 
         const payload: Record<string, any> = {
-            image: rawBase64,
+            image: 'image',  // References the FormData part name
             width,
             height,
             req_type: reqType,
@@ -714,13 +714,21 @@ export async function augmentImage(
             payload.prompt = prompt || ''
         }
 
+        // NAI expects FormData: JSON blob as "request" + image binary as "image"
+        const jsonBlob = new Blob([JSON.stringify(payload)], { type: 'application/json' })
+        const imageBytes = Uint8Array.from(atob(rawBase64), c => c.charCodeAt(0))
+        const imageBlob = new Blob([imageBytes], { type: 'image/png' })
+
+        const formData = new FormData()
+        formData.append('request', jsonBlob, 'blob')
+        formData.append('image', imageBlob, 'image.png')
+
         const response = await CLIENT_FETCH('https://image.novelai.net/ai/augment-image', {
             method: 'POST',
             headers: {
-                ...DEFAULT_HEADERS,
                 'Authorization': `Bearer ${token.trim()}`,
             },
-            body: JSON.stringify(payload),
+            body: formData,
         })
 
         if (!response.ok) {
