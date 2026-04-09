@@ -524,7 +524,7 @@ export default function SceneMode() {
                                     </Button>
                                 </DropdownMenuTrigger>
                             </Tip>
-                            <DropdownMenuContent>
+                            <DropdownMenuContent className="max-h-[300px] overflow-y-auto">
                                 {presets.filter(p => p.id !== activePresetId).map(p => (
                                     <DropdownMenuItem key={p.id} onClick={() => moveSelectedScenesToPreset(p.id)}>
                                         <ArrowRight className="mr-2 h-4 w-4" />

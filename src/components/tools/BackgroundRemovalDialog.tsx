@@ -80,7 +80,7 @@ export function BackgroundRemovalDialog({
             if (!filePath) return // User cancelled
 
             // Convert base64 to binary
-            const base64Data = processedImage.replace(/^data:image\/png;base64,/, '')
+            const base64Data = processedImage.replace(/^data:image\/\w+;base64,/, '')
             const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
 
             // Write to file
@@ -90,6 +90,7 @@ export function BackgroundRemovalDialog({
             onClose()
         } catch (e) {
             console.error("Failed to save image", e)
+            toast({ title: t('common.saveFailed', '저장 실패'), variant: 'destructive' })
         }
     }
 

@@ -195,7 +195,7 @@ export function MosaicDialog({
             if (!filePath) return
 
             const dataUrl = canvasRef.current.toDataURL('image/png')
-            const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '')
+            const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '')
             const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
 
             await writeFile(filePath, binaryData)
@@ -204,6 +204,7 @@ export function MosaicDialog({
             onClose()
         } catch (e) {
             console.error("Failed to save image", e)
+            toast({ title: t('common.saveFailed', '저장 실패'), variant: 'destructive' })
         }
     }
 
