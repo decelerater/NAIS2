@@ -140,7 +140,52 @@ class SmartToolsService {
     }
 
     /**
-     * Upscale image using NovelAI's augment-image API (4x)
+     * Run NAI Director Tools (augment-image API)
+     * Supports: bg-removal, lineart, sketch, colorize, emotion, declutter
+     */
+    public async directorTool(
+        imageBase64: string,
+        token: string,
+        reqType: 'bg-removal' | 'lineart' | 'sketch' | 'colorize' | 'emotion' | 'declutter',
+        options?: { defry?: number; prompt?: string; emotion?: string }
+    ): Promise<string> {
+        const { augmentImage } = await import('@/services/novelai-api')
+
+        const img = new Image()
+        await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve()
+            img.onerror = reject
+            img.src = imageBase64
+        })
+        const width = img.width
+        const height = img.height
+        img.src = ''
+
+        // For emotion type, combine emotion and prompt as "emotion;;prompt"
+        let prompt = options?.prompt
+        if (reqType === 'emotion' && options?.emotion) {
+            prompt = `${options.emotion};;${options.prompt || ''}`
+        }
+
+        const result = await augmentImage(
+            token,
+            imageBase64,
+            width,
+            height,
+            reqType,
+            options?.defry,
+            prompt,
+        )
+
+        if (!result.success || !result.imageData) {
+            throw new Error(result.error || 'Director tool failed')
+        }
+
+        return `data:image/png;base64,${result.imageData}`
+    }
+
+    /**
+     * Upscale image using NovelAI's upscale API (4x)
      */
     public async upscale(imageBase64: string, token: string): Promise<string> {
         const { upscaleImage } = await import('@/services/novelai-api')

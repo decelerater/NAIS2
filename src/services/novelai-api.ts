@@ -686,6 +686,41 @@ export async function generateImage(
 }
 
 /**
+ * Augment image using NovelAI's Director Tools API
+ * Supports: bg-removal, lineart, sketch, colorize, emotion, declutter
+ */
+export async function augmentImage(
+    token: string,
+    imageBase64: string,
+    width: number,
+    height: number,
+    reqType: string,
+    defry?: number,
+    prompt?: string,
+): Promise<{ success: boolean; imageData?: string; error?: string }> {
+    try {
+        const rawBase64 = stripBase64Header(imageBase64)
+        const { invoke } = await import('@tauri-apps/api/core')
+        const result = await invoke<{ success: boolean; image_data?: string; error?: string }>('augment_image', {
+            token: token.trim(),
+            image: rawBase64,
+            width,
+            height,
+            reqType,
+            defry: defry ?? null,
+            prompt: prompt ?? null,
+        })
+        return {
+            success: result.success,
+            imageData: result.image_data,
+            error: result.error,
+        }
+    } catch (error) {
+        return { success: false, error: `Augment error: ${error}` }
+    }
+}
+
+/**
  * Upscale image using NovelAI's upscale API (4x upscale)
  */
 export async function upscaleImage(

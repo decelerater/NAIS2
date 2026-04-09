@@ -253,6 +253,90 @@ async fn upscale_image(
     }
 }
 
+#[derive(Debug, Serialize)]
+struct AugmentPayload {
+    image: String,
+    width: i32,
+    height: i32,
+    req_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    defry: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prompt: Option<String>,
+}
+
+#[tauri::command]
+async fn augment_image(
+    token: String,
+    image: String,
+    width: i32,
+    height: i32,
+    req_type: String,
+    defry: Option<i32>,
+    prompt: Option<String>,
+) -> UpscaleResult {
+    let client = reqwest::Client::new();
+
+    let payload = AugmentPayload {
+        image,
+        width,
+        height,
+        req_type,
+        defry,
+        prompt,
+    };
+
+    let result = client
+        .post("https://image.novelai.net/ai/augment-image")
+        .header("Authorization", format!("Bearer {}", token.trim()))
+        .header("Content-Type", "application/json")
+        .timeout(std::time::Duration::from_secs(120))
+        .json(&payload)
+        .send()
+        .await;
+
+    match result {
+        Ok(response) => {
+            if response.status().is_success() {
+                match response.bytes().await {
+                    Ok(bytes) => {
+                        match extract_image_from_zip(&bytes) {
+                            Ok(base64_image) => UpscaleResult {
+                                success: true,
+                                image_data: Some(base64_image),
+                                error: None,
+                            },
+                            Err(e) => UpscaleResult {
+                                success: false,
+                                image_data: None,
+                                error: Some(format!("ZIP 처리 오류: {}", e)),
+                            },
+                        }
+                    }
+                    Err(e) => UpscaleResult {
+                        success: false,
+                        image_data: None,
+                        error: Some(format!("응답 읽기 오류: {}", e)),
+                    },
+                }
+            } else {
+                let status = response.status().as_u16();
+                let error_text = response.text().await.unwrap_or_default();
+                UpscaleResult {
+                    success: false,
+                    image_data: None,
+                    error: Some(format!("API 오류 {}: {}", status, error_text)),
+                }
+            }
+        }
+        Err(e) => UpscaleResult {
+            success: false,
+            image_data: None,
+            error: Some(format!("네트워크 오류: {}", e)),
+        },
+    }
+}
+
 fn extract_image_from_zip(zip_bytes: &[u8]) -> Result<String, String> {
     use base64::{engine::general_purpose::STANDARD, Engine as _};
     use std::io::{Cursor, Read};
@@ -491,6 +575,7 @@ pub fn run() {
             verify_token,
             get_anlas_balance,
             upscale_image,
+            augment_image,
             remove_background,
             open_embedded_browser,
             close_embedded_browser,

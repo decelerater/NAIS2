@@ -9,7 +9,7 @@ import { useGenerationStore } from '@/stores/generation-store'
 import { smartTools } from '@/services/smart-tools'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/use-toast'
-import { Eraser, Palette, Grid3X3, Wand2, Upload, RefreshCw, Download, X, Maximize2, Image as ImageIcon, Paintbrush, ImagePlus } from 'lucide-react'
+import { Eraser, Palette, Grid3X3, Wand2, Upload, RefreshCw, Download, X, Maximize2, Image as ImageIcon, Paintbrush, ImagePlus, PenTool, Pencil, Droplets, Smile, Sparkles } from 'lucide-react'
 import { writeFile, BaseDirectory, exists, mkdir } from '@tauri-apps/plugin-fs'
 import { pictureDir, join } from '@tauri-apps/api/path'
 import { TagAnalysisDialog } from '@/components/tools/TagAnalysisDialog'
@@ -183,6 +183,27 @@ export default function ToolsMode() {
 
             // Navigate to main mode
             navigate('/')
+        } catch (e) {
+            console.error(e)
+            toast({ title: t('smartTools.error', '작업 실패'), description: String(e), variant: 'destructive' })
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    // Director Tools handler
+    const handleDirectorTool = async (reqType: 'lineart' | 'sketch' | 'colorize' | 'emotion' | 'declutter', options?: { defry?: number; prompt?: string; emotion?: string }) => {
+        if (!processedImage) return
+        if (!token) {
+            toast({ title: t('toast.tokenRequired.title', 'API 토큰 필요'), description: t('toast.tokenRequired.desc', '설정에서 토큰을 입력해주세요.'), variant: 'destructive' })
+            return
+        }
+
+        setIsLoading(true)
+        try {
+            const result = await smartTools.directorTool(processedImage, token, reqType, options)
+            setActiveImage(result)
+            toast({ title: t('smartTools.directorComplete', '처리 완료'), variant: 'success' })
         } catch (e) {
             console.error(e)
             toast({ title: t('smartTools.error', '작업 실패'), description: String(e), variant: 'destructive' })
@@ -452,6 +473,85 @@ export default function ToolsMode() {
                             {t('smartTools.startUpscale', '4배 업스케일 시작')}
                         </Button>
                     </ToolCard>
+
+                    {/* Separator */}
+                    <div className="border-t border-border pt-2">
+                        <p className="text-xs text-muted-foreground font-medium mb-3">
+                            {t('smartTools.directorTools', 'Director Tools')}
+                            <span className="text-orange-400 ml-2">NAI API</span>
+                        </p>
+                    </div>
+
+                    {/* Line Art */}
+                    <ToolCard
+                        icon={PenTool}
+                        color="text-slate-400"
+                        title={t('smartTools.lineart', '라인아트 추출')}
+                        disabled={!processedImage || isLoading || !token}
+                    >
+                        <Button className="w-full" variant="secondary" onClick={() => handleDirectorTool('lineart')} disabled={!processedImage || isLoading || !token}>
+                            {t('smartTools.runLineart', '라인아트 추출')}
+                        </Button>
+                    </ToolCard>
+
+                    {/* Sketch */}
+                    <ToolCard
+                        icon={Pencil}
+                        color="text-gray-400"
+                        title={t('smartTools.sketch', '스케치 변환')}
+                        disabled={!processedImage || isLoading || !token}
+                    >
+                        <Button className="w-full" variant="secondary" onClick={() => handleDirectorTool('sketch')} disabled={!processedImage || isLoading || !token}>
+                            {t('smartTools.runSketch', '스케치 변환')}
+                        </Button>
+                    </ToolCard>
+
+                    {/* Colorize */}
+                    <ToolCard
+                        icon={Droplets}
+                        color="text-cyan-400"
+                        title={t('smartTools.colorize', '색칠하기')}
+                        disabled={!processedImage || isLoading || !token}
+                    >
+                        <DirectorToolWithOptions
+                            onRun={(defry, prompt) => handleDirectorTool('colorize', { defry, prompt })}
+                            disabled={!processedImage || isLoading || !token}
+                            showPrompt
+                            promptPlaceholder={t('smartTools.colorizePrompt', '색상 힌트 (예: red hair, blue eyes)')}
+                            buttonLabel={t('smartTools.runColorize', '색칠 실행')}
+                            t={t}
+                        />
+                    </ToolCard>
+
+                    {/* Emotion */}
+                    <ToolCard
+                        icon={Smile}
+                        color="text-yellow-400"
+                        title={t('smartTools.emotion', '표정 변경')}
+                        disabled={!processedImage || isLoading || !token}
+                    >
+                        <DirectorToolWithOptions
+                            onRun={(defry, prompt, emotion) => handleDirectorTool('emotion', { defry, prompt, emotion })}
+                            disabled={!processedImage || isLoading || !token}
+                            showEmotion
+                            showPrompt
+                            promptPlaceholder={t('smartTools.emotionPrompt', '추가 프롬프트 (선택)')}
+                            buttonLabel={t('smartTools.runEmotion', '표정 변경')}
+                            t={t}
+                        />
+                    </ToolCard>
+
+                    {/* Declutter */}
+                    <ToolCard
+                        icon={Sparkles}
+                        color="text-emerald-400"
+                        title={t('smartTools.declutter', '이미지 정리')}
+                        disabled={!processedImage || isLoading || !token}
+                    >
+                        <Button className="w-full" variant="secondary" onClick={() => handleDirectorTool('declutter')} disabled={!processedImage || isLoading || !token}>
+                            {t('smartTools.runDeclutter', '정리 실행')}
+                        </Button>
+                    </ToolCard>
                 </div>
             </div>
 
@@ -502,3 +602,72 @@ function ToolCard({ children, icon: Icon, color, title, disabled }: any) {
 }
 
 import { cn } from '@/lib/utils'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
+import { Label } from '@/components/ui/label'
+
+const EMOTIONS = [
+    'neutral', 'happy', 'sad', 'angry', 'scared', 'surprised',
+    'tired', 'excited', 'nervous', 'thinking', 'confused',
+    'shy', 'disgusted', 'smug', 'bored', 'laughing',
+    'crying', 'tsundere', 'yandere', 'kuudere', 'blushing',
+] as const
+
+function DirectorToolWithOptions({ onRun, disabled, showPrompt, showEmotion, promptPlaceholder, buttonLabel, t }: {
+    onRun: (defry: number, prompt: string, emotion?: string) => void
+    disabled: boolean
+    showPrompt?: boolean
+    showEmotion?: boolean
+    promptPlaceholder?: string
+    buttonLabel: string
+    t: any
+}) {
+    const [defry, setDefry] = useState(0)
+    const [prompt, setPrompt] = useState('')
+    const [emotion, setEmotion] = useState('happy')
+
+    return (
+        <div className="space-y-3">
+            {showEmotion && (
+                <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">{t('smartTools.emotionType', '표정')}</Label>
+                    <Select value={emotion} onValueChange={setEmotion}>
+                        <SelectTrigger className="h-8 text-sm">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[200px]">
+                            {EMOTIONS.map(e => (
+                                <SelectItem key={e} value={e}>{e}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
+            {showPrompt && (
+                <Input
+                    value={prompt}
+                    onChange={e => setPrompt(e.target.value)}
+                    placeholder={promptPlaceholder}
+                    className="h-8 text-sm"
+                />
+            )}
+            <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">
+                    {t('smartTools.defry', '원본 유지도')}: {defry}
+                </Label>
+                <Slider
+                    value={[defry]}
+                    onValueChange={([v]) => setDefry(v)}
+                    min={0}
+                    max={5}
+                    step={1}
+                    className="w-full"
+                />
+            </div>
+            <Button className="w-full" variant="secondary" onClick={() => onRun(defry, prompt, emotion)} disabled={disabled}>
+                {buttonLabel}
+            </Button>
+        </div>
+    )
+}
