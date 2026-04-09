@@ -720,8 +720,8 @@ export async function augmentImage(
         const imageBlob = new Blob([imageBytes], { type: 'image/png' })
 
         const formData = new FormData()
-        formData.append('request', jsonBlob, 'blob')
         formData.append('image', imageBlob, 'image.png')
+        formData.append('request', jsonBlob, 'blob')
 
         const response = await CLIENT_FETCH('https://image.novelai.net/ai/augment-image', {
             method: 'POST',
