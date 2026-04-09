@@ -360,6 +360,9 @@ export function useSceneGeneration() {
                         toast({ title: t('common.saveFailed', '파일 저장 실패'), description: String(saveError), variant: 'destructive' })
                     }
 
+                    // Refresh Anlas balance after each image
+                    useAuthStore.getState().refreshAnlas()
+
                     // Update progress counter
                     const currentState = useSceneStore.getState()
                     setGenerationProgress(currentState.completedCount + 1, currentState.totalQueuedCount)
