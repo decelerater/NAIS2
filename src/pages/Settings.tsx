@@ -77,7 +77,7 @@ export default function Settings() {
     const { t, i18n } = useTranslation()
     const { theme, setTheme } = useThemeStore()
     const { token, isVerified, anlas, isLoading, verifyAndSave } = useAuthStore()
-    const { savePath, autoSave, setSavePath, setAutoSave, promptFontSize, setPromptFontSize, useStreaming, setUseStreaming, generationDelay, setGenerationDelay, geminiApiKey, setGeminiApiKey, useAbsolutePath, libraryPath, useAbsoluteLibraryPath, setLibraryPath, imageFormat, setImageFormat } = useSettingsStore()
+    const { savePath, autoSave, setSavePath, setAutoSave, promptFontSize, setPromptFontSize, useStreaming, setUseStreaming, generationDelay, setGenerationDelay, geminiApiKey, setGeminiApiKey, useAbsolutePath, libraryPath, useAbsoluteLibraryPath, setLibraryPath, imageFormat, setImageFormat, useCharacterFolderStructure, sceneFileNameTemplate } = useSettingsStore()
     const { bindings, enabled: shortcutsEnabled, setBinding, resetBinding, resetAllBindings, setEnabled: setShortcutsEnabled } = useShortcutStore()
     const [localGeminiKey, setLocalGeminiKey] = useState(geminiApiKey)
 
@@ -94,11 +94,9 @@ export default function Settings() {
     const [isCheckingUpdate, setIsCheckingUpdate] = useState(false)
     const { pendingUpdate, isDownloading, setPendingUpdate, setIsDownloading, setDownloadProgress } = useUpdateStore()
 
-    // 키바인드 편집 상태
     const [editingAction, setEditingAction] = useState<ShortcutAction | null>(null)
     const [recordedBinding, setRecordedBinding] = useState<KeyBinding | null>(null)
     
-    // 백업 관련 상태
     const [isExporting, setIsExporting] = useState(false)
     const [isImporting, setIsImporting] = useState(false)
     const [storeSizes, setStoreSizes] = useState<{ [key: string]: number }>({})
@@ -106,12 +104,10 @@ export default function Settings() {
 
     useEffect(() => {
         getVersion().then(setAppVersion).catch(() => setAppVersion('dev'))
-        // 마지막 백업 시간 로드
         const lastBackup = localStorage.getItem('nais2-last-backup-time')
         if (lastBackup) setLastBackupTime(lastBackup)
     }, [])
     
-    // 데이터 크기 로드 (backup 섹션 진입 시)
     useEffect(() => {
         if (activeSection === 'backup') {
             getStoreSizes().then(setStoreSizes).catch(console.error)
@@ -142,7 +138,6 @@ export default function Settings() {
         toast({ title: t('settingsPage.saved'), variant: 'success' })
     }
 
-    // Browse for folder using native dialog
     const handleBrowseFolder = async () => {
         try {
             const selected = await open({
@@ -159,7 +154,6 @@ export default function Settings() {
         }
     }
 
-    // Reset to default Pictures subfolder
     const handleResetToDefault = async () => {
         setLocalSavePath('NAIS_Output')
         setIsAbsolutePath(false)
@@ -167,7 +161,6 @@ export default function Settings() {
         toast({ title: t('settingsPage.saved'), variant: 'success' })
     }
 
-    // Library path handlers
     const handleSaveLibraryPath = () => {
         setLibraryPath(localLibraryPath, isAbsoluteLibraryPath)
         toast({ title: t('settingsPage.saved'), variant: 'success' })
@@ -196,14 +189,12 @@ export default function Settings() {
         toast({ title: t('settingsPage.saved'), variant: 'success' })
     }
     
-    // 백업 내보내기
     const handleExportBackup = async () => {
         setIsExporting(true)
         try {
             const backup = await exportAllData()
             const storeCount = Object.keys(backup).filter(k => !k.startsWith('_')).length
             
-            // 파일 저장 다이얼로그
             const filePath = await save({
                 title: t('settingsPage.backup.export'),
                 defaultPath: `nais2-backup-${new Date().toISOString().split('T')[0]}.json`,
@@ -213,7 +204,6 @@ export default function Settings() {
             if (filePath) {
                 await writeTextFile(filePath, JSON.stringify(backup, null, 2))
                 
-                // 마지막 백업 시간 저장
                 const now = new Date().toISOString()
                 localStorage.setItem('nais2-last-backup-time', now)
                 setLastBackupTime(now)
@@ -236,10 +226,8 @@ export default function Settings() {
         }
     }
     
-    // 백업 복원
     const handleImportBackup = async () => {
         try {
-            // 파일 선택 다이얼로그
             const filePath = await open({
                 title: t('settingsPage.backup.import'),
                 filters: [{ name: 'JSON', extensions: ['json'] }],
@@ -248,7 +236,6 @@ export default function Settings() {
             
             if (!filePath || typeof filePath !== 'string') return
             
-            // 확인 다이얼로그
             const confirmed = window.confirm(
                 `${t('settingsPage.backup.confirmRestoreDesc')}\n\n${t('settingsPage.backup.restoreWarning')}`
             )
@@ -259,7 +246,6 @@ export default function Settings() {
             const content = await readTextFile(filePath)
             const backup = JSON.parse(content)
             
-            // 유효성 검증
             if (!backup._exportedAt || !backup._version) {
                 toast({
                     title: t('settingsPage.backup.importFailed'),
@@ -277,7 +263,6 @@ export default function Settings() {
                 variant: 'success',
             })
             
-            // 앱 재시작
             setTimeout(() => {
                 relaunch()
             }, 1500)
@@ -294,7 +279,6 @@ export default function Settings() {
         }
     }
     
-    // 데이터 크기 포맷팅
     const formatSize = (bytes: number) => {
         if (bytes < 0) return 'Error'
         if (bytes === 0) return '0 B'
@@ -307,7 +291,6 @@ export default function Settings() {
 
     return (
         <div className="flex h-full">
-            {/* Sidebar */}
             <aside className="w-56 border-r border-border/50 p-4 space-y-1">
                 <h2 className="text-lg font-semibold mb-4 px-2">{t('settingsPage.title')}</h2>
                 {SECTIONS.map((section) => (
@@ -327,10 +310,8 @@ export default function Settings() {
                 ))}
             </aside>
 
-            {/* Content */}
             <main className="flex-1 p-6 overflow-y-auto">
                 <div className="max-w-2xl space-y-8">
-                    {/* General Section */}
                     {activeSection === 'general' && (
                         <section className="space-y-6">
                             <div>
@@ -364,7 +345,6 @@ export default function Settings() {
                                     </Select>
                                 </div>
 
-                                {/* Streaming Toggle */}
                                 <div className="flex items-center justify-between pt-4 border-t border-border/30">
                                     <div className="space-y-0.5">
                                         <label className="text-sm font-medium flex items-center gap-2">
@@ -381,7 +361,6 @@ export default function Settings() {
                                     />
                                 </div>
 
-                                {/* Generation Delay */}
                                 <div className="space-y-3 pt-4 border-t border-border/30">
                                     <div className="flex items-center justify-between">
                                         <label className="text-sm font-medium flex items-center gap-2">
@@ -403,7 +382,6 @@ export default function Settings() {
                                     </p>
                                 </div>
 
-                                {/* Version Info */}
                                 <div className="space-y-4 pt-4 border-t border-border/30">
                                     <div className="flex items-center justify-between">
                                         <div className="space-y-0.5">
@@ -423,10 +401,7 @@ export default function Settings() {
                                                 try {
                                                     const update = await check()
                                                     if (update) {
-                                                        // Store the update object
                                                         setCurrentUpdateObject(update)
-
-                                                        // Check if already downloaded
                                                         if (pendingUpdate && pendingUpdate.version === update.version) {
                                                             toast({
                                                                 title: t('update.readyToInstall', '업데이트 설치 준비됨'),
@@ -506,10 +481,7 @@ export default function Settings() {
                                             )}
                                         </Button>
                                     </div>
-
-                                    {/* Pending Update Install Section - only show if pending version is newer */}
                                     {pendingUpdate && appVersion && (() => {
-                                        // Compare versions
                                         const current = appVersion.replace(/^v/, '').split('.').map(Number)
                                         const pending = pendingUpdate.version.replace(/^v/, '').split('.').map(Number)
                                         let isNewer = false
@@ -556,7 +528,6 @@ export default function Settings() {
                         </section>
                     )}
 
-                    {/* Appearance Section */}
                     {activeSection === 'appearance' && (
                         <section className="space-y-6">
                             <div>
@@ -622,7 +593,6 @@ export default function Settings() {
                         </section>
                     )}
 
-                    {/* API Section */}
                     {activeSection === 'api' && (
                         <section className="space-y-6">
                             <div>
@@ -632,7 +602,6 @@ export default function Settings() {
                                 </p>
                             </div>
 
-                            {/* Anlas Balance Card */}
                             {isVerified && anlas && (
                                 <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 rounded-xl border border-amber-500/20">
                                     <div className="p-3 bg-amber-500/20 rounded-full">
@@ -727,7 +696,6 @@ export default function Settings() {
                         </section>
                     )}
 
-                    {/* Storage Section */}
                     {activeSection === 'storage' && (
                         <section className="space-y-6">
                             <div>
@@ -751,7 +719,6 @@ export default function Settings() {
                                             value={localSavePath}
                                             onChange={(e) => {
                                                 setLocalSavePath(e.target.value)
-                                                // If user manually types, assume it's relative unless it looks like an absolute path
                                                 const isAbsolute = /^[A-Za-z]:[\\/]/.test(e.target.value) || e.target.value.startsWith('/')
                                                 setIsAbsolutePath(isAbsolute)
                                             }}
@@ -802,7 +769,6 @@ export default function Settings() {
                                 </div>
                             </div>
 
-                            {/* Library Path Setting */}
                             <div className="border border-border/50 rounded-xl p-6 space-y-6 bg-card/30">
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between">
@@ -855,7 +821,6 @@ export default function Settings() {
                                 </div>
                             </div>
 
-                            {/* Image Format Setting */}
                             <div className="border border-border/50 rounded-xl p-6 space-y-4 bg-card/30">
                                 <div className="flex items-center justify-between">
                                     <div className="space-y-0.5">
@@ -878,10 +843,41 @@ export default function Settings() {
                                     {t('settingsPage.save.imageFormat.help', 'WebP offers smaller file sizes with similar quality. PNG provides lossless quality.')}
                                 </p>
                             </div>
+
+                            {/* 🔥 우리가 추가한 폴더 구조 설정 UI 🔥 */}
+                            <div className="border border-border/50 rounded-xl p-6 space-y-4 bg-card/30">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-0.5">
+                                        <label className="text-sm font-medium">캐릭터 폴더 구조 사용</label>
+                                        <p className="text-xs text-muted-foreground">
+                                            ON: 캐릭터명/씬명/ &nbsp;|&nbsp; OFF: NAIS_Scene/캐릭터명/씬명/
+                                        </p>
+                                    </div>
+                                    <Switch
+    checked={useCharacterFolderStructure}
+    onChange={(e) => useSettingsStore.setState({ useCharacterFolderStructure: e.target.checked })}
+/>
+                                </div>
+                            </div>
+
+                            {/* 🔥 우리가 추가한 씬 파일명 형식 설정 UI 🔥 */}
+                            <div className="border border-border/50 rounded-xl p-6 space-y-4 bg-card/30">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">씬 파일명 형식</label>
+                                    <p className="text-xs text-muted-foreground">
+                                        사용 가능한 변수: {'{preset}'} (캐릭터), {'{scene}'} (씬), {'{timestamp}'}, {'{date}'}, {'{seed}'}
+                                    </p>
+                                    <Input
+                                        value={sceneFileNameTemplate}
+                                        onChange={e => useSettingsStore.setState({ sceneFileNameTemplate: e.target.value })}
+                                        placeholder="{preset}_{scene}_{timestamp}"
+                                    />
+                                </div>
+                            </div>
+
                         </section>
                     )}
 
-                    {/* Shortcuts Section */}
                     {activeSection === 'shortcuts' && (
                         <section className="space-y-6">
                             <div>
@@ -891,7 +887,6 @@ export default function Settings() {
                                 </p>
                             </div>
 
-                            {/* Enable/Disable Shortcuts */}
                             <div className="border border-border/50 rounded-xl p-6 bg-card/30">
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -907,7 +902,6 @@ export default function Settings() {
                                 </div>
                             </div>
 
-                            {/* Shortcut Bindings */}
                             <div className="border border-border/50 rounded-xl p-6 space-y-4 bg-card/30">
                                 <div className="flex items-center justify-between">
                                     <h3 className="text-sm font-medium">{t('settingsPage.shortcuts.bindings', '키 바인딩')}</h3>
@@ -917,7 +911,6 @@ export default function Settings() {
                                     </Button>
                                 </div>
 
-                                {/* Navigation */}
                                 <div className="space-y-2">
                                     <h4 className="text-xs text-muted-foreground uppercase tracking-wider">
                                         {t('settingsPage.shortcuts.navigation', '네비게이션')}
@@ -950,7 +943,6 @@ export default function Settings() {
                                     ))}
                                 </div>
 
-                                {/* Dialogs */}
                                 <div className="space-y-2">
                                     <h4 className="text-xs text-muted-foreground uppercase tracking-wider">
                                         {t('settingsPage.shortcuts.dialogs', '다이얼로그')}
@@ -983,7 +975,6 @@ export default function Settings() {
                                     ))}
                                 </div>
 
-                                {/* Actions */}
                                 <div className="space-y-2">
                                     <h4 className="text-xs text-muted-foreground uppercase tracking-wider">
                                         {t('settingsPage.shortcuts.actions', '액션')}
@@ -1019,7 +1010,6 @@ export default function Settings() {
                         </section>
                     )}
                     
-                    {/* Backup Section */}
                     {activeSection === 'backup' && (
                         <section className="space-y-6">
                             <div>
@@ -1029,7 +1019,6 @@ export default function Settings() {
                                 </p>
                             </div>
                             
-                            {/* Export/Import */}
                             <div className="border border-border/50 rounded-xl p-6 space-y-6 bg-card/30">
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
@@ -1075,7 +1064,6 @@ export default function Settings() {
                                     </div>
                                 </div>
                                 
-                                {/* Last Backup Time */}
                                 {lastBackupTime && (
                                     <div className="border-t border-border/30 pt-4">
                                         <p className="text-xs text-muted-foreground">
@@ -1085,7 +1073,6 @@ export default function Settings() {
                                 )}
                             </div>
                             
-                            {/* Data Sizes */}
                             <div className="border border-border/50 rounded-xl p-6 space-y-4 bg-card/30">
                                 <div className="flex items-center justify-between">
                                     <h4 className="text-sm font-medium flex items-center gap-2">
@@ -1124,7 +1111,6 @@ export default function Settings() {
                                 </div>
                             </div>
                             
-                            {/* Warning */}
                             <div className="border border-yellow-500/30 rounded-xl p-4 bg-yellow-500/5">
                                 <div className="flex gap-3">
                                     <AlertTriangle className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
@@ -1144,7 +1130,6 @@ export default function Settings() {
     )
 }
 
-// 단축키 행 컴포넌트
 interface ShortcutRowProps {
     action: ShortcutAction
     binding: KeyBinding
@@ -1162,12 +1147,10 @@ interface ShortcutRowProps {
 function ShortcutRow({ action, binding, allBindings, isEditing, recordedBinding, onStartEdit, onSave, onCancel, onReset, onKeyRecord, t }: ShortcutRowProps) {
     const [conflictAction, setConflictAction] = useState<ShortcutAction | null>(null)
 
-    // 충돌 체크 함수
     const checkConflict = (newBinding: KeyBinding): ShortcutAction | null => {
         for (const [otherAction, otherBinding] of Object.entries(allBindings)) {
-            if (otherAction === action) continue // 자기 자신은 제외
+            if (otherAction === action) continue
 
-            // 키 조합이 정확히 같은지 확인
             if (
                 otherBinding.key === newBinding.key &&
                 !!otherBinding.ctrl === !!newBinding.ctrl &&
@@ -1205,13 +1188,11 @@ function ShortcutRow({ action, binding, allBindings, isEditing, recordedBinding,
             e.preventDefault()
             e.stopPropagation()
 
-            // Escape로 취소
             if (e.key === 'Escape') {
                 onCancel()
                 return
             }
 
-            // 단독 modifier 키는 무시
             if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
                 return
             }
@@ -1274,7 +1255,6 @@ function ShortcutRow({ action, binding, allBindings, isEditing, recordedBinding,
                 </div>
             </div>
 
-            {/* 충돌 경고 */}
             {conflictAction && recordedBinding && (
                 <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-destructive/10 border border-destructive/20">
                     <div className="flex items-center gap-2 text-sm text-destructive">

@@ -39,6 +39,10 @@ interface SettingsState {
     // Image format setting
     imageFormat: 'png' | 'webp'
 
+    // 🔥 우리가 새롭게 추가한 설정 2가지 (여기가 정답 위치입니다) 🔥
+    useCharacterFolderStructure: boolean;
+    sceneFileNameTemplate: string;
+
     // Actions
     setSavePath: (path: string, useAbsolute?: boolean) => void
     setAutoSave: (autoSave: boolean) => void
@@ -56,6 +60,7 @@ interface SettingsState {
     setImageFormat: (format: 'png' | 'webp') => void
 }
 
+// 여기가 '중간 즈음'에 있던 create 부분 (앱을 처음 켰을 때 기본값을 정해주는 곳) 입니다.
 export const useSettingsStore = create<SettingsState>()(
     persist(
         (set) => ({
@@ -74,6 +79,10 @@ export const useSettingsStore = create<SettingsState>()(
             libraryPath: 'NAIS_Library', // Default: relative to Pictures folder
             useAbsoluteLibraryPath: false, // Default: relative to Pictures folder
             imageFormat: 'png', // Default: PNG format
+
+            // 🔥 우리가 새롭게 추가한 설정의 '기본값' 2가지 🔥
+            useCharacterFolderStructure: true,
+            sceneFileNameTemplate: '{preset}_{scene}_{timestamp}',
 
             setSavePath: (savePath, useAbsolute) => set({
                 savePath,
